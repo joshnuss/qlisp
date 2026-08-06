@@ -1,12 +1,12 @@
-import eslintConfigPrettier from "eslint-config-prettier";
-import tseslint from "typescript-eslint";
+import eslintConfigPrettier from 'eslint-config-prettier'
+import tseslint from 'typescript-eslint'
 
 export default tseslint.config(
   ...tseslint.configs.recommended,
   eslintConfigPrettier,
   {
     rules: {
-      "no-unused-vars": "warn",
+      'no-unused-vars': 'warn',
     },
   }
-);
+)
