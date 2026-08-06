@@ -1,8 +1,7 @@
 import * as readline from 'node:readline'
-import { lexer } from './lexer.ts'
-import { parse } from './parser.ts'
+import { read } from './interpreter.ts'
 
-function startRepl(): void {
+function start(): void {
   let index = 1
 
   const rl = readline.createInterface({
@@ -15,19 +14,17 @@ function startRepl(): void {
   rl.prompt()
 
   rl.on('line', (line: string) => {
-    const trimmedInput = line.trim()
+    const input = line.trim()
 
-    if (trimmedInput === 'exit' || trimmedInput === 'quit') {
+    if (input === 'exit' || input === 'quit') {
       rl.close()
       return
     }
 
-    if (trimmedInput.length > 0) {
+    if (input.length > 0) {
       try {
-        const tokens = lexer(trimmedInput)
-        const ast = parse(tokens)
+        const ast = read(input)
 
-        // Pretty print AST structure with unlimited depth
         console.dir(ast, { depth: null, colors: true })
 
         index++
@@ -49,4 +46,4 @@ function startRepl(): void {
   })
 }
 
-startRepl()
+start()
