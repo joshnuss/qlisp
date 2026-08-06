@@ -64,7 +64,9 @@ async function runTests(dirPath: string): Promise<void> {
 
   for (const file of testFiles) {
     const testPath = path.join(targetDir, file);
-    process.stdout.write(`Test: ${file}... `);
+    const relativePath = path.relative(process.cwd(), testPath)
+
+    process.stdout.write(`Running ${chalk.blue(relativePath)}... `);
 
     const { stdout, stderr, code } = await runTest(testPath);
 
@@ -82,7 +84,6 @@ async function runTests(dirPath: string): Promise<void> {
 
     const txtFile = file.replace(/\.test$/, '.txt');
     const txtPath = path.join(targetDir, txtFile);
-    const relativePath = path.relative(process.cwd(), testPath)
 
     if (!existsSync(txtPath)) {
       console.log(`${chalk.red.bold('Failed')} (missing expected output file: ${relativePath})`);
@@ -101,8 +102,6 @@ async function runTests(dirPath: string): Promise<void> {
       console.log(expected.trimEnd());
       console.log('--- [Actual] -----');
       console.log(stdout.trimEnd());
-      console.log('--- [Run] -----');
-      console.log(`$ bin/lisp ${relativePath}`)
       console.log('-------------------------\n');
       failed++;
     }
