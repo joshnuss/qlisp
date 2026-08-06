@@ -49,10 +49,10 @@ async function runAll(dirPath: string): Promise<void> {
   const targetDir = path.resolve(dirPath)
   const files = await readdir(targetDir)
 
-  const testFiles = files.filter((name) => name.endsWith('.test')).sort()
+  const testFiles = files.filter((name) => name.endsWith('.lisp')).sort()
 
   if (testFiles.length === 0) {
-    console.log(`No .test files found in ${targetDir}`)
+    console.log(`No .lisp files found in ${targetDir}`)
     return
   }
 
@@ -85,7 +85,7 @@ async function runAll(dirPath: string): Promise<void> {
       continue
     }
 
-    const txtFile = file.replace(/\.test$/, '.txt')
+    const txtFile = file.replace(/\.lisp$/, '.txt')
     const txtPath = path.join(targetDir, txtFile)
 
     if (!existsSync(txtPath)) {
