@@ -8,7 +8,8 @@ describe('parse()', () => {
     const tokens: Token[] = [
       { type: 'number', value: '42', line: 1, col: 1 },
       { type: 'string', value: 'hello', line: 1, col: 4 },
-      { type: 'symbol', value: '#t', line: 1, col: 12 },
+      { type: 'symbol', value: 't', line: 1, col: 12 },
+      { type: 'symbol', value: 'nil', line: 1, col: 14 },
     ]
 
     const ast = parse(tokens)
@@ -17,6 +18,7 @@ describe('parse()', () => {
       { type: 'number', value: 42 },
       { type: 'string', value: 'hello' },
       { type: 'boolean', value: true },
+      { type: 'boolean', value: false },
     ])
   })
 

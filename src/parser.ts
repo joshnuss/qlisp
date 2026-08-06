@@ -49,9 +49,9 @@ function parseExpression(tokens: Token[]): ASTNode {
   }
 
   const isTrueLiteral =
-    currentToken.value === '#t' || currentToken.value === 'true'
+    currentToken.value === 't' || currentToken.value === 'true'
   const isFalseLiteral =
-    currentToken.value === '#f' || currentToken.value === 'false'
+    currentToken.value === 'nil' || currentToken.value === 'false'
 
   if (isTrueLiteral) return { type: 'boolean', value: true }
   if (isFalseLiteral) return { type: 'boolean', value: false }
