@@ -125,4 +125,135 @@ describe('parse()', () => {
 
     expect(() => parse(tokens)).toThrowError(/Unexpected '\)' at line 1, col 3/)
   })
+
+  describe('prefixes', () => {
+    it("should expand quote (') into (quote expr)", () => {
+      const tokens: Token[] = [
+        { type: 'symbol', value: "'", line: 1, col: 1 },
+        { type: 'symbol', value: 'foo', line: 1, col: 2 },
+      ]
+
+      const ast = parse(tokens)
+
+      expect(ast).toEqual<ASTNode[]>([
+        {
+          type: 'list',
+          elements: [
+            { type: 'symbol', name: 'quote' },
+            { type: 'symbol', name: 'foo' },
+          ],
+        },
+      ])
+    })
+
+    it("should expand quoted lists: '(1 2)", () => {
+      // Input tokens corresponding to: '(1 2)
+      const tokens: Token[] = [
+        { type: 'symbol', value: "'", line: 1, col: 1 },
+        { type: 'paren', value: '(', line: 1, col: 2 },
+        { type: 'number', value: '1', line: 1, col: 3 },
+        { type: 'number', value: '2', line: 1, col: 5 },
+        { type: 'paren', value: ')', line: 1, col: 6 },
+      ]
+
+      const ast = parse(tokens)
+
+      expect(ast).toEqual<ASTNode[]>([
+        {
+          type: 'list',
+          elements: [
+            { type: 'symbol', name: 'quote' },
+            {
+              type: 'list',
+              elements: [
+                { type: 'number', value: 1 },
+                { type: 'number', value: 2 },
+              ],
+            },
+          ],
+        },
+      ])
+    })
+
+    it('should expand quasiquote (`) and unquote (,)', () => {
+      // Input tokens corresponding to: `(a ,b)
+      const tokens: Token[] = [
+        { type: 'symbol', value: '`', line: 1, col: 1 },
+        { type: 'paren', value: '(', line: 1, col: 2 },
+        { type: 'symbol', value: 'a', line: 1, col: 3 },
+        { type: 'symbol', value: ',', line: 1, col: 5 },
+        { type: 'symbol', value: 'b', line: 1, col: 6 },
+        { type: 'paren', value: ')', line: 1, col: 7 },
+      ]
+
+      const ast = parse(tokens)
+
+      expect(ast).toEqual<ASTNode[]>([
+        {
+          type: 'list',
+          elements: [
+            { type: 'symbol', name: 'quasiquote' },
+            {
+              type: 'list',
+              elements: [
+                { type: 'symbol', name: 'a' },
+                {
+                  type: 'list',
+                  elements: [
+                    { type: 'symbol', name: 'unquote' },
+                    { type: 'symbol', name: 'b' },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ])
+    })
+
+    it('should expand unquote-splicing (,@)', () => {
+      // Input tokens corresponding to: `(1 ,@items)
+      const tokens: Token[] = [
+        { type: 'symbol', value: '`', line: 1, col: 1 },
+        { type: 'paren', value: '(', line: 1, col: 2 },
+        { type: 'number', value: '1', line: 1, col: 3 },
+        { type: 'symbol', value: ',@', line: 1, col: 5 },
+        { type: 'symbol', value: 'items', line: 1, col: 7 },
+        { type: 'paren', value: ')', line: 1, col: 12 },
+      ]
+
+      const ast = parse(tokens)
+
+      expect(ast).toEqual<ASTNode[]>([
+        {
+          type: 'list',
+          elements: [
+            { type: 'symbol', name: 'quasiquote' },
+            {
+              type: 'list',
+              elements: [
+                { type: 'number', value: 1 },
+                {
+                  type: 'list',
+                  elements: [
+                    { type: 'symbol', name: 'unquote-splicing' },
+                    { type: 'symbol', name: 'items' },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ])
+    })
+
+    it('should throw an error when a prefix has no following expression', () => {
+      // Input tokens corresponding to trailing quote: '
+      const tokens: Token[] = [{ type: 'symbol', value: "'", line: 1, col: 1 }]
+
+      expect(() => parse(tokens)).toThrowError(
+        /Unexpected end of input while parsing expression/
+      )
+    })
+  })
 })

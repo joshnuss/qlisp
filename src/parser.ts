@@ -56,11 +56,29 @@ function parseExpression(tokens: Token[]): ASTNode {
   if (isTrueLiteral) return { type: 'boolean', value: true }
   if (isFalseLiteral) return { type: 'boolean', value: false }
 
+  if (currentToken.type === 'symbol') {
+    const prefixMap: Record<string, string> = {
+      "'": 'quote',
+      '`': 'quasiquote',
+      ',': 'unquote',
+      ',@': 'unquote-splicing',
+    }
+
+    const expandedSymbol = prefixMap[currentToken.value]
+    if (expandedSymbol) {
+      // Recursively parse the NEXT expression following the prefix operator
+      const targetExpression = parseExpression(tokens)
+
+      return {
+        type: 'list',
+        elements: [{ type: 'symbol', name: expandedSymbol }, targetExpression],
+      }
+    }
+  }
   return { type: 'symbol', name: currentToken.value }
 }
 
 export function parse(inputTokens: Token[] | Token): ASTNode[] {
-  // Normalize input to Token[] regardless of whether lexer returned a single Token or an array
   const tokenStream = Array.isArray(inputTokens)
     ? [...inputTokens]
     : [inputTokens]
