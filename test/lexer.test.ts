@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { lexer } from '../src/lexer.js'
 
 describe('lexer()', () => {
-  it('should tokenize parentheses correctly', () => {
+  it('should tokenize parentheses', () => {
     const tokens = lexer('()')
 
     expect(tokens).toEqual([
@@ -11,7 +11,21 @@ describe('lexer()', () => {
     ])
   })
 
-  it('should distinguish symbols and numbers', () => {
+  it('should tokenize number literal', () => {
+    const tokens = lexer('42')
+
+    expect(tokens).toEqual([{ type: 'number', value: '42', line: 1, col: 1 }])
+  })
+
+  it('should tokenize string', () => {
+    const tokens = lexer('"apple"')
+
+    expect(tokens).toEqual([
+      { type: 'string', value: 'apple', line: 1, col: 1 },
+    ])
+  })
+
+  it('should distinguish between symbols and numbers', () => {
     const tokens = lexer('(+ count 42 3.14 -10)')
 
     expect(tokens.map((t) => ({ type: t.type, value: t.value }))).toEqual([
@@ -29,6 +43,7 @@ describe('lexer()', () => {
     const tokens = lexer('(define msg "hello world")')
 
     const stringToken = tokens.find((t) => t.type === 'string')
+
     expect(stringToken).toEqual({
       type: 'string',
       value: 'hello world',
