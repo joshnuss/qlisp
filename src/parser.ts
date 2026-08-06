@@ -17,7 +17,9 @@ function parseExpression(tokens: Token[]): ASTNode {
     const listElements: ASTNode[] = []
 
     const isNextTokenClosingParen = (): boolean =>
-      tokens.length > 0 && tokens[0].type === 'paren' && tokens[0].value === ')'
+      tokens.length > 0 &&
+      tokens[0]?.type === 'paren' &&
+      tokens[0].value === ')'
 
     while (tokens.length > 0 && !isNextTokenClosingParen()) {
       listElements.push(parseExpression(tokens))
