@@ -61,8 +61,8 @@ async function runAll(dirPath: string): Promise<void> {
 
   let spinner = ora({
     spinner: 'dots',
-    text: `Running ${testFiles.length} test(s)...\n${'-'.repeat(40)}`
-  }).start();
+    text: `Running ${testFiles.length} test(s)...\n${'-'.repeat(40)}`,
+  }).start()
 
   for (const file of testFiles) {
     const testPath = path.join(targetDir, file)
@@ -120,7 +120,7 @@ async function runAll(dirPath: string): Promise<void> {
   }
 }
 
-const dir = process.argv[2] || 'test'
+const dir = process.argv[2] || 'examples'
 
 runAll(dir).catch((err) => {
   console.error('Fatal error running harness:', err)
