@@ -13,7 +13,6 @@ function parseExpression(tokens: Token[]): ASTNode {
   const isCloseParenthesis =
     currentToken.type === 'paren' && currentToken.value === ')'
 
-  // 1. Lists: ( expr1 expr2 ... )
   if (isOpenParenthesis) {
     const listElements: ASTNode[] = []
 
@@ -35,24 +34,20 @@ function parseExpression(tokens: Token[]): ASTNode {
     return { type: 'list', elements: listElements }
   }
 
-  // 2. Erroneous standalone closing parenthesis
   if (isCloseParenthesis) {
     throw new Error(
       `Unexpected ')' at line ${currentToken.line}, col ${currentToken.col}`
     )
   }
 
-  // 3. Numbers
   if (currentToken.type === 'number') {
     return { type: 'number', value: Number(currentToken.value) }
   }
 
-  // 4. Strings
   if (currentToken.type === 'string') {
     return { type: 'string', value: currentToken.value }
   }
 
-  // 5. Booleans
   const isTrueLiteral =
     currentToken.value === '#t' || currentToken.value === 'true'
   const isFalseLiteral =
@@ -61,7 +56,6 @@ function parseExpression(tokens: Token[]): ASTNode {
   if (isTrueLiteral) return { type: 'boolean', value: true }
   if (isFalseLiteral) return { type: 'boolean', value: false }
 
-  // 6. Symbols / Identifiers
   return { type: 'symbol', name: currentToken.value }
 }
 
