@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process'
 import { readdir, readFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
-import chalk from 'chalk'
+import ora from 'ora'
 
 interface RunResult {
   stdout: string
@@ -45,7 +45,7 @@ function runTest(filePath: string): Promise<RunResult> {
   return promise
 }
 
-async function runTests(dirPath: string): Promise<void> {
+async function runAll(dirPath: string): Promise<void> {
   const targetDir = path.resolve(dirPath)
   const files = await readdir(targetDir)
 
@@ -59,18 +59,22 @@ async function runTests(dirPath: string): Promise<void> {
   let passed = 0
   let failed = 0
 
-  console.log(`Running ${testFiles.length} test(s)...\n${'-'.repeat(40)}`)
+  let spinner = ora({
+    spinner: 'dots',
+    text: `Running ${testFiles.length} test(s)...\n${'-'.repeat(40)}`
+  }).start();
 
   for (const file of testFiles) {
     const testPath = path.join(targetDir, file)
     const relativePath = path.relative(process.cwd(), testPath)
 
-    process.stdout.write(`Running ${chalk.blue(relativePath)}... `)
+    spinner.text = `Running ${relativePath}`
 
     const { stdout, stderr, code } = await runTest(testPath)
 
     if (code !== 0) {
-      console.log(`${chalk.bold.red('Failed')} (non-zero exit code ${code})`)
+      spinner.fail(relativePath)
+      console.log(`(non-zero exit code ${code})`)
 
       if (stderr.trim()) {
         console.log('\n--- [stderr] ---')
@@ -85,9 +89,8 @@ async function runTests(dirPath: string): Promise<void> {
     const txtPath = path.join(targetDir, txtFile)
 
     if (!existsSync(txtPath)) {
-      console.log(
-        `${chalk.red.bold('Failed')} (missing expected output file: ${relativePath})`
-      )
+      spinner.fail(relativePath)
+      console.log(`(missing expected output file: ${relativePath})`)
       failed++
       continue
     }
@@ -95,10 +98,10 @@ async function runTests(dirPath: string): Promise<void> {
     const expected = await readFile(txtPath, 'utf-8')
 
     if (stdout === expected) {
-      console.log(`${chalk.green.bold('Success')}`)
+      spinner.succeed(relativePath)
       passed++
     } else {
-      console.log(`${chalk.red.bold('Failed')}`)
+      spinner.fail(relativePath)
       console.log('\n--- [Expected] ---')
       console.log(expected.trimEnd())
       console.log('--- [Actual] -----')
@@ -106,10 +109,11 @@ async function runTests(dirPath: string): Promise<void> {
       console.log('-------------------------\n')
       failed++
     }
+
+    spinner = spinner.render()
   }
 
-  console.log('-'.repeat(40))
-  console.log(`Summary: ${passed} passed, ${failed} failed.`)
+  spinner.info(`Summary: ${passed} passed, ${failed} failed.`)
 
   if (failed > 0) {
     process.exit(1)
@@ -118,7 +122,7 @@ async function runTests(dirPath: string): Promise<void> {
 
 const dir = process.argv[2] || 'test'
 
-runTests(dir).catch((err) => {
+runAll(dir).catch((err) => {
   console.error('Fatal error running harness:', err)
   process.exit(1)
 })
