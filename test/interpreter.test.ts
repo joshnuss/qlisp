@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { read, evalFile, evalNodes, pretty } from '../src/interpreter.js'
+import {
+  read,
+  evalFile,
+  evalNodes,
+  pretty,
+  type LispValue,
+} from '../src/interpreter.js'
 import path from 'node:path'
 
 describe('read()', () => {
@@ -27,7 +33,18 @@ describe('read()', () => {
   })
 })
 
-describe('eval()', () => {
+describe('evalNodes()', () => {
+  it('returns scalar value', () => {
+    const ast = read('42')
+
+    console.log(ast)
+
+    expect(evalNodes(ast)).toEqual({
+      type: 'number',
+      value: 42,
+    })
+  })
+
   it('adds numbers together and returns a LispValue number', () => {
     const ast = read('(+ 1 2 3)')
     expect(evalNodes(ast)).toEqual({

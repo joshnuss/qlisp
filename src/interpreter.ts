@@ -27,6 +27,10 @@ export function evalNodes(ast: ASTNode[]): LispValue {
   const [firstNode] = ast
 
   if (firstNode?.type !== 'list') {
+    if (firstNode && 'value' in firstNode) {
+      return firstNode
+    }
+
     throw new Error('Expected a list node')
   }
 
