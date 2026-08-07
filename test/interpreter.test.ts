@@ -1,7 +1,6 @@
-import { describe, it, expect, afterEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { read, evalFile, evalNodes } from '../src/interpreter.js'
 import path from 'node:path'
-import fs from 'node:fs/promises'
 
 describe('read()', () => {
   it('returns ast', () => {
