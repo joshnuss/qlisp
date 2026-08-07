@@ -4,6 +4,9 @@
   "description": "",
   "main": "src/index.ts",
   "type": "module",
+  "bin": {
+    "lisp": "./bin/lisp"
+  },
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
