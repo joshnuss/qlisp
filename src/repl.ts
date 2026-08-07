@@ -1,7 +1,7 @@
 import * as readline from 'node:readline'
 import { read, evalNodes } from './interpreter.ts'
 
-function start(): void {
+export function start(): void {
   let index = 1
 
   const rl = readline.createInterface({
@@ -46,5 +46,3 @@ function start(): void {
     process.exit(0)
   })
 }
-
-start()
