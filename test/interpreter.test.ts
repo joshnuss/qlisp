@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { read, evalFile, evalNodes } from '../src/interpreter.js'
+import { read, evalFile, evalNodes, pretty } from '../src/interpreter.js'
 import path from 'node:path'
 
 describe('read()', () => {
@@ -71,5 +71,48 @@ describe('evalFile()', () => {
 
   it('throws if the file does not exist', async () => {
     await expect(evalFile('non_existent_file.lisp')).rejects.toThrow()
+  })
+})
+
+describe('pretty()', () => {
+  it('formats primitives correctly', () => {
+    expect(pretty({ type: 'number', value: 60 })).toBe('60')
+    expect(pretty({ type: 'string', value: 'hello' })).toBe('"hello"')
+    expect(pretty({ type: 'boolean', value: true })).toBe('#t')
+    expect(pretty({ type: 'boolean', value: false })).toBe('#f')
+    expect(pretty({ type: 'symbol', name: 'foo' })).toBe('foo')
+  })
+
+  it('formats flat lists', () => {
+    const listVal: LispValue = {
+      type: 'list',
+      elements: [
+        { type: 'symbol', name: '+' },
+        { type: 'number', value: 1 },
+        { type: 'number', value: 2 },
+      ],
+    }
+
+    expect(pretty(listVal)).toBe('(+ 1 2)')
+  })
+
+  it('formats nested lists', () => {
+    const nestedVal: LispValue = {
+      type: 'list',
+      elements: [
+        { type: 'symbol', name: '*' },
+        { type: 'number', value: 2 },
+        {
+          type: 'list',
+          elements: [
+            { type: 'symbol', name: '+' },
+            { type: 'number', value: 3 },
+            { type: 'number', value: 4 },
+          ],
+        },
+      ],
+    }
+
+    expect(pretty(nestedVal)).toBe('(* 2 (+ 3 4))')
   })
 })

@@ -1,5 +1,5 @@
 import * as readline from 'node:readline'
-import { read, evalNodes } from './interpreter.ts'
+import { read, evalNodes, pretty } from './interpreter.ts'
 
 export function start(): void {
   let index = 1
@@ -26,7 +26,7 @@ export function start(): void {
         const ast = read(input)
         const result = await evalNodes(ast)
 
-        console.dir(result, { depth: null, colors: true })
+        console.log(pretty(result))
 
         index++
       } catch (error) {

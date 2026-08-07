@@ -48,3 +48,29 @@ export function evalNodes(ast: ASTNode[]): LispValue {
     value: total,
   }
 }
+
+export function pretty(val: LispValue): string {
+  switch (val.type) {
+    case 'number':
+      return String(val.value)
+
+    case 'string':
+      return `"${val.value}"`
+
+    case 'boolean':
+      return val.value ? '#t' : '#f'
+
+    case 'symbol':
+      return val.name
+
+    case 'list':
+      return `(${val.elements.map(pretty).join(' ')})`
+
+    default: {
+      const _exhaustiveCheck: never = val
+      throw new Error(
+        `Unhandled LispValue type: ${JSON.stringify(_exhaustiveCheck)}`
+      )
+    }
+  }
+}
