@@ -23,7 +23,7 @@ jobs:
       - run: pnpm lint
 
   typecheck:
-    name: Typecheck
+    name: Types
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -38,7 +38,7 @@ jobs:
       - run: pnpm check
 
   test:
-    name: Tests
+    name: Test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
