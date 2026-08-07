@@ -1,5 +1,5 @@
 import * as readline from 'node:readline'
-import { read } from './interpreter.ts'
+import { read, evalNodes } from './interpreter.ts'
 
 function start(): void {
   let index = 1
@@ -13,7 +13,7 @@ function start(): void {
 
   rl.prompt()
 
-  rl.on('line', (line: string) => {
+  rl.on('line', async (line: string) => {
     const input = line.trim()
 
     if (input === 'exit' || input === 'quit') {
@@ -24,8 +24,9 @@ function start(): void {
     if (input.length > 0) {
       try {
         const ast = read(input)
+        const result = await evalNodes(ast)
 
-        console.dir(ast, { depth: null, colors: true })
+        console.dir(result, { depth: null, colors: true })
 
         index++
       } catch (error) {
