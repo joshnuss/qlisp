@@ -37,8 +37,6 @@ describe('evalNodes()', () => {
   it('returns scalar value', () => {
     const ast = read('42')
 
-    console.log(ast)
-
     expect(evalNodes(ast)).toEqual({
       type: 'number',
       value: 42,
