@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import path from 'node:path'
 import {
   read,
   evalFile,
@@ -6,7 +7,7 @@ import {
   pretty,
   type LispValue,
 } from '../src/interpreter.js'
-import path from 'node:path'
+import { createGlobalEnv } from '../src/env.ts'
 
 describe('read()', () => {
   it('returns ast', () => {
@@ -35,40 +36,78 @@ describe('read()', () => {
 
 describe('evalNodes()', () => {
   it('returns scalar value', () => {
+    const env = createGlobalEnv()
     const ast = read('42')
 
-    expect(evalNodes(ast)).toEqual({
+    expect(evalNodes(ast, env)).toEqual({
       type: 'number',
       value: 42,
     })
   })
 
   it('adds numbers together and returns a LispValue number', () => {
+    const env = createGlobalEnv()
     const ast = read('(+ 1 2 3)')
-    expect(evalNodes(ast)).toEqual({
+
+    expect(evalNodes(ast, env)).toEqual({
       type: 'number',
       value: 6,
     })
   })
 
   it("returns { type: 'number', value: 0 } for (+)", () => {
+    const env = createGlobalEnv()
     const ast = read('(+)')
-    expect(evalNodes(ast)).toEqual({
+
+    expect(evalNodes(ast, env)).toEqual({
       type: 'number',
       value: 0,
     })
   })
 
   it('throws when non-number arguments are passed', () => {
+    const env = createGlobalEnv()
     const ast = read('(+ 1 "hello")')
-    expect(() => evalNodes(ast)).toThrowError(
-      "All arguments to '+' must be numbers"
+
+    expect(() => evalNodes(ast, env)).toThrowError(
+      "'+' expects numeric arguments"
     )
   })
 
-  it("throws when operator is not '+'", () => {
-    const ast = read('(- 5 2)')
-    expect(() => evalNodes(ast)).toThrowError("Only '+' operator is supported")
+  it('calls built-in functions (+ 1 2 3)', () => {
+    const env = createGlobalEnv()
+    const ast = read('(+ 1 2 3)')
+
+    expect(evalNodes(ast, env)).toEqual({
+      type: 'number',
+      value: 6,
+    })
+  })
+
+  it('defines and calls a user-defined function', () => {
+    const env = createGlobalEnv()
+    const ast = read(`
+      (defun double (x) (* x 2))
+      (double 21)
+    `)
+
+    expect(evalNodes(ast, env)).toEqual({
+      type: 'number',
+      value: 42,
+    })
+  })
+
+  it('handles multi-argument functions with nested function calls', () => {
+    const env = createGlobalEnv()
+    const ast = read(`
+      (defun add-square (a b) (+ (* a a) (* b b)))
+      (add-square 3 4)
+    `)
+
+    expect(evalNodes(ast, env)).toEqual({
+      type: 'number',
+      value: 25,
+    })
   })
 })
 
@@ -76,7 +115,8 @@ describe('evalFile()', () => {
   const testFilePath = path.join(__dirname, '../examples/add.lisp')
 
   it('reads a file and evaluates the Lisp expression', async () => {
-    const result = await evalFile(testFilePath)
+    const env = createGlobalEnv()
+    const result = await evalFile(testFilePath, env)
 
     expect(result).toEqual({
       type: 'number',
@@ -85,7 +125,8 @@ describe('evalFile()', () => {
   })
 
   it('throws if the file does not exist', async () => {
-    await expect(evalFile('non_existent_file.lisp')).rejects.toThrow()
+    const env = createGlobalEnv()
+    await expect(evalFile('non_existent_file.lisp', env)).rejects.toThrow()
   })
 })
 
