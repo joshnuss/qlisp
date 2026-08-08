@@ -32,6 +32,8 @@ export function evalNode(node: ASTNode, env: Env): LispValue {
 
   // 2. Variable Lookup (Lisp-2: uses variable table)
   if (node.type === 'symbol') {
+    if (node.name.startsWith("'"))
+      return { type: 'symbol', name: node.name.substring(1) }
     return env.getVar(node.name)
   }
 

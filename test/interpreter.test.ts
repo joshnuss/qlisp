@@ -4,6 +4,7 @@ import {
   read,
   evalFile,
   evalNodes,
+  evalNode,
   pretty,
   type LispValue,
 } from '../src/interpreter.js'
@@ -31,6 +32,21 @@ describe('read()', () => {
     const input = '(+ 1 2'
 
     expect(() => read(input)).toThrowError(/Unclosed parenthesis/)
+  })
+})
+
+describe('evalNode', () => {
+  it('returns text that starts with a quote as a symbol', () => {
+    const env = createGlobalEnv()
+    env.defineVar('x', { type: 'number', value: 42 })
+
+    // 1. Unquoted symbol -> Variable lookup
+    const varResult = evalNode({ type: 'symbol', name: 'x' }, env)
+    expect(varResult).toEqual({ type: 'number', value: 42 })
+
+    // 2. Quoted symbol -> Symbol literal (bypasses env lookup)
+    const symbolResult = evalNode({ type: 'symbol', name: "'x" }, env)
+    expect(symbolResult).toEqual({ type: 'symbol', name: 'x' })
   })
 })
 
