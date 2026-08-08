@@ -2,7 +2,7 @@
   "name": "qlisp Development",
   "image": "mcr.microsoft.com/devcontainers/typescript-node:24-bookworm",
   "postCreateCommand": "corepack enable && pnpm install && pnpm link --global",
-  "postStartCommand": "qlisp",
+  "postStartCommand": "pnpm dev",
   "customizations": {
     "vscode": {
       "settings": {
