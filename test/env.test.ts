@@ -285,4 +285,39 @@ describe('Env', () => {
       ).toThrowError("'not' expects exactly 1 argument")
     })
   })
+
+  describe('defmacro & getMacro', () => {
+    it('defines and retrieves a macro in current env', () => {
+      const env = new Env()
+      const body = [{ type: 'symbol' as const, name: 'x' }]
+      env.defmacro('my-macro', ['x'], body)
+
+      const macro = env.getMacro('my-macro')
+      expect(macro).not.toBeNull()
+      expect(macro?.params).toEqual(['x'])
+      expect(macro?.body).toEqual(body)
+      expect(macro?.env).toBe(env)
+    })
+
+    it('looks up macros in parent environment recursively', () => {
+      const parentEnv = new Env()
+      const body = [{ type: 'number' as const, value: 42 }]
+      parentEnv.defmacro('parent-macro', ['a', 'b'], body)
+
+      const childEnv = new Env(parentEnv)
+      const macro = childEnv.getMacro('parent-macro')
+
+      expect(macro).not.toBeNull()
+      expect(macro?.params).toEqual(['a', 'b'])
+      expect(macro?.body).toEqual(body)
+      expect(macro?.env).toBe(parentEnv)
+    })
+
+    it('returns null when macro is not defined', () => {
+      const parentEnv = new Env()
+      const childEnv = new Env(parentEnv)
+
+      expect(childEnv.getMacro('unknown-macro')).toBeNull()
+    })
+  })
 })

@@ -125,6 +125,61 @@ describe('evalNodes()', () => {
       value: 25,
     })
   })
+
+  describe('defmacro special form and macro expansion', () => {
+    it('returns the defined macro symbol name upon evaluation', () => {
+      const env = createGlobalEnv()
+      const ast = read("(defmacro inc (x) (list '+ x 1))")
+      expect(evalNodes(ast, env)).toEqual({
+        type: 'symbol',
+        name: 'inc',
+      })
+    })
+
+    it('defines a macro and expands it during evaluation', () => {
+      const env = createGlobalEnv()
+      const ast = read(`
+        (defmacro inc (x) (list '+ x 1))
+        (inc 41)
+      `)
+
+      expect(evalNodes(ast, env)).toEqual({
+        type: 'number',
+        value: 42,
+      })
+    })
+
+    it('passes arguments to macro without evaluating them first', () => {
+      const env = createGlobalEnv()
+      const ast = read(`
+        (defmacro quote-first (a b) a)
+        (quote-first 'hello 'world)
+      `)
+
+      expect(evalNodes(ast, env)).toEqual({
+        type: 'symbol',
+        name: 'hello',
+      })
+    })
+
+    it('throws error when macro definition has invalid syntax', () => {
+      const env = createGlobalEnv()
+
+      // Invalid name node
+      const ast1 = read('(defmacro 123 (x) x)')
+      expect(() => evalNodes(ast1, env)).toThrowError('Invalid defmacro syntax')
+
+      // Invalid params node (not a list)
+      const ast2 = read('(defmacro foo "not-a-list" x)')
+      expect(() => evalNodes(ast2, env)).toThrowError('Invalid defmacro syntax')
+
+      // Non-symbol parameter in params list
+      const ast3 = read('(defmacro foo (x 123) x)')
+      expect(() => evalNodes(ast3, env)).toThrowError(
+        'Macro parameters must be symbols'
+      )
+    })
+  })
 })
 
 describe('evalFile()', () => {

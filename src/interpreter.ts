@@ -1,5 +1,6 @@
 import { lexer } from './lexer.ts'
 import { parse } from './parser.ts'
+import { macroexpand } from './macro.ts'
 import type { ASTNode } from './ast.ts'
 import { readFile } from 'node:fs/promises'
 import { Env } from './env.ts'
@@ -44,6 +45,23 @@ export function evalNode(node: ASTNode, env: Env): LispValue {
     }
 
     const [first, ...rest] = node.elements
+
+    // Special form: (defmacro name (params...) body...)
+    if (first?.type === 'symbol' && first.name === 'defmacro') {
+      const [nameNode, paramsNode, ...body] = rest
+      if (nameNode?.type !== 'symbol' || paramsNode?.type !== 'list') {
+        throw new Error('Invalid defmacro syntax')
+      }
+
+      const params = paramsNode.elements.map((p) => {
+        if (p.type !== 'symbol')
+          throw new Error('Macro parameters must be symbols')
+        return p.name
+      })
+
+      env.defmacro(nameNode.name, params, body)
+      return { type: 'symbol', name: nameNode.name }
+    }
 
     // --- Special Form: (if condition then-branch else-branch?) ---
     if (first?.type === 'symbol' && first.name === 'if') {
@@ -165,7 +183,10 @@ export function evalNodes(ast: ASTNode[], env: Env): LispValue {
   let result: LispValue = { type: 'boolean', value: false }
 
   for (const node of ast) {
-    result = evalNode(node, env)
+    // Phase 1: Macro Expansion
+    const expandedAST = macroexpand(node, env)
+    // Phase 2: Evaluation
+    result = evalNode(expandedAST, env)
   }
 
   return result

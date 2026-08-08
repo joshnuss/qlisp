@@ -1,6 +1,12 @@
 import type { ASTNode } from './ast.ts'
 import { pretty } from './interpreter.ts'
 
+export type MacroBinding = {
+  params: string[]
+  body: ASTNode[]
+  env: Env
+}
+
 export type BuiltinFn = (args: LispValue[]) => LispValue
 
 export type UserDefinedFn = {
@@ -78,6 +84,7 @@ function compareArgs(
 export class Env {
   public parent: Env | null
 
+  private macros = new Map<string, MacroBinding>()
   private variables = new Map<string, LispValue>()
   private functions = new Map<string, FunctionBinding>()
 
@@ -113,6 +120,16 @@ export class Env {
       return
     }
     throw new Error(`Cannot set unbound variable: '${name}'`)
+  }
+
+  defmacro(name: string, params: string[], body: ASTNode[]): void {
+    this.macros.set(name, { params, body, env: this })
+  }
+
+  getMacro(name: string): MacroBinding | null {
+    if (this.macros.has(name)) return this.macros.get(name)!
+    if (this.parent) return this.parent.getMacro(name)
+    return null
   }
 
   defun(name: string, params: string[], body: ASTNode[]): void {
