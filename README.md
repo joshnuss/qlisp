@@ -1,6 +1,6 @@
 # qlisp
 
-A toy Lisp interpreter written using Gemini.
+A toy Lisp interpreter built in a day using Gemini.
 
 ---
 
