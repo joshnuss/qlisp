@@ -38,7 +38,7 @@ function reduceArgs(
     }
 
     if (nums.length === 1) {
-      const value = unaryOp ? unaryOp(nums[0]) : nums[0]
+      const value = unaryOp ? unaryOp(nums[0]!) : nums[0]!
       return { type: 'number', value }
     }
 

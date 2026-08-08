@@ -44,7 +44,7 @@ export function evalNode(node: ASTNode, env: Env): LispValue {
     const [first, ...rest] = node.elements
 
     // --- Special Form: (defun name (params...) body...) ---
-    if (first.type === 'symbol' && first.name === 'defun') {
+    if (first?.type === 'symbol' && first.name === 'defun') {
       const [nameNode, paramsNode, ...bodyNodes] = rest
 
       if (nameNode?.type !== 'symbol') {
@@ -65,7 +65,7 @@ export function evalNode(node: ASTNode, env: Env): LispValue {
 
     // --- Special Form: (setq var value) or (define var value) ---
     if (
-      first.type === 'symbol' &&
+      first?.type === 'symbol' &&
       (first.name === 'setq' || first.name === 'define')
     ) {
       const [varNode, valNode] = rest
@@ -74,13 +74,17 @@ export function evalNode(node: ASTNode, env: Env): LispValue {
         throw new Error('Variable name must be a symbol')
       }
 
+      if (!valNode) {
+        throw new Error(`Missing value for ${varNode.name}`)
+      }
+
       const val = evalNode(valNode, env)
       env.defineVar(varNode.name, val)
       return val
     }
 
     // --- Function Call (Lisp-2: Look up function name in function table) ---
-    if (first.type !== 'symbol') {
+    if (first?.type !== 'symbol') {
       throw new Error('First element of a function call must be a symbol')
     }
 
@@ -100,14 +104,14 @@ export function evalNode(node: ASTNode, env: Env): LispValue {
 
       if (args.length !== params.length) {
         throw new Error(
-          `Function '${first.name}' expects ${params.length} arguments, got ${args.length}`
+          `Function '${funcBinding.name}' expects ${params.length} arguments, got ${args.length}`
         )
       }
 
       // Create a local scope extending the function's lexical closure
       const localEnv = new Env(closureEnv)
       params.forEach((param, index) => {
-        localEnv.defineVar(param, args[index])
+        localEnv.defineVar(param, args[index]!)
       })
 
       // Evaluate body sequentially and return the final value
