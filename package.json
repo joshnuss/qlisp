@@ -5,7 +5,7 @@
   "main": "src/index.ts",
   "type": "module",
   "bin": {
-    "lisp": "./bin/lisp"
+    "qlisp": "./bin/lisp"
   },
   "scripts": {
     "dev": "tsx watch src/index.ts",
