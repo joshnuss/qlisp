@@ -2,6 +2,8 @@
 
 A toy Lisp interpreter built in a day using Gemini.
 
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/joshnuss/qlisp)
+
 ---
 
 ## Installation & Setup
