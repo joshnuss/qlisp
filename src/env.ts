@@ -48,6 +48,33 @@ function reduceArgs(
   }
 }
 
+function compareArgs(
+  name: string,
+  cmp: (a: number, b: number) => boolean
+): BuiltinFn {
+  return (args: LispValue[]): LispValue => {
+    if (args.length < 2) {
+      throw new Error(`'${name}' requires at least 2 arguments`)
+    }
+
+    const nums = args.map((arg) => {
+      if (arg.type !== 'number') {
+        throw new Error(`'${name}' expects numeric arguments`)
+      }
+      return arg.value
+    })
+
+    // Check every consecutive pair: a[0] cmp a[1], a[1] cmp a[2], ...
+    for (let i = 0; i < nums.length - 1; i++) {
+      if (!cmp(nums[i]!, nums[i + 1]!)) {
+        return { type: 'boolean', value: false }
+      }
+    }
+
+    return { type: 'boolean', value: true }
+  }
+}
+
 export class Env {
   public parent: Env | null
 
@@ -171,6 +198,42 @@ export function createGlobalEnv(): Env {
       type: 'list',
       elements: args,
     }
+  })
+
+  env.defineBuiltinFunc(
+    '=',
+    compareArgs('=', (a, b) => a === b)
+  )
+  env.defineBuiltinFunc(
+    '<',
+    compareArgs('<', (a, b) => a < b)
+  )
+  env.defineBuiltinFunc(
+    '>',
+    compareArgs('>', (a, b) => a > b)
+  )
+  env.defineBuiltinFunc(
+    '<=',
+    compareArgs('<=', (a, b) => a <= b)
+  )
+  env.defineBuiltinFunc(
+    '>=',
+    compareArgs('>=', (a, b) => a >= b)
+  )
+
+  env.defineBuiltinFunc('not', (args: LispValue[]): LispValue => {
+    if (args.length !== 1) {
+      throw new Error("'not' expects exactly 1 argument")
+    }
+
+    const val = args[0]!
+
+    // Truthiness check: false and empty list () are falsey
+    const isFalsey =
+      (val.type === 'boolean' && val.value === false) ||
+      (val.type === 'list' && val.elements.length === 0)
+
+    return { type: 'boolean', value: isFalsey }
   })
 
   return env

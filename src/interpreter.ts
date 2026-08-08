@@ -43,6 +43,36 @@ export function evalNode(node: ASTNode, env: Env): LispValue {
 
     const [first, ...rest] = node.elements
 
+    // --- Special Form: (if condition then-branch else-branch?) ---
+    if (first?.type === 'symbol' && first.name === 'if') {
+      const [condNode, thenNode, elseNode] = rest
+
+      if (!condNode || !thenNode) {
+        throw new Error(
+          "'if' requires at least a condition and a 'then' branch"
+        )
+      }
+
+      // 1. Evaluate ONLY the condition
+      const condVal = evalNode(condNode, env)
+
+      // 2. Truthiness check: anything that is not boolean false or empty list '() is truthy
+      const isTruthy = !(
+        (condVal.type === 'boolean' && condVal.value === false) ||
+        (condVal.type === 'list' && condVal.elements.length === 0)
+      )
+
+      // 3. Evaluate ONLY the branch dictated by the condition
+      if (isTruthy) {
+        return evalNode(thenNode, env)
+      } else if (elseNode) {
+        return evalNode(elseNode, env)
+      } else {
+        // Unhandled false branch evaluates to boolean false (or nil)
+        return { type: 'boolean', value: false }
+      }
+    }
+
     // --- Special Form: (defun name (params...) body...) ---
     if (first?.type === 'symbol' && first.name === 'defun') {
       const [nameNode, paramsNode, ...bodyNodes] = rest

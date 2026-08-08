@@ -2,6 +2,10 @@ import { describe, it, expect, vi } from 'vitest'
 import { Env, createGlobalEnv } from '../src/env.ts'
 import { type LispValue } from '../src/interpreter.js'
 
+function num(n: number): LispValue {
+  return { type: 'number', value: n }
+}
+
 describe('Env', () => {
   it('keeps variables and functions in separate namespaces', () => {
     const env = new Env()
@@ -183,6 +187,102 @@ describe('Env', () => {
           elements: [innerList, outerNum],
         })
       }
+    })
+  })
+  describe('comparison builtins', () => {
+    const env = createGlobalEnv()
+
+    it('handles variadic =', () => {
+      const eq = env.getFunc('=')
+      if (eq.kind !== 'builtin') return
+
+      expect(eq.fn([num(5), num(5)])).toEqual({ type: 'boolean', value: true })
+      expect(eq.fn([num(5), num(5), num(5), num(5)])).toEqual({
+        type: 'boolean',
+        value: true,
+      })
+      expect(eq.fn([num(5), num(5), num(4), num(5)])).toEqual({
+        type: 'boolean',
+        value: false,
+      })
+    })
+
+    it('handles variadic < chaining', () => {
+      const lt = env.getFunc('<')
+      if (lt.kind !== 'builtin') return
+
+      expect(lt.fn([num(1), num(2), num(3), num(4)])).toEqual({
+        type: 'boolean',
+        value: true,
+      })
+      expect(lt.fn([num(1), num(3), num(2), num(4)])).toEqual({
+        type: 'boolean',
+        value: false,
+      })
+    })
+
+    it('throws when given fewer than 2 arguments', () => {
+      const lt = env.getFunc('<')
+      if (lt.kind !== 'builtin') return
+
+      expect(() => lt.fn([num(1)])).toThrowError(
+        "'<' requires at least 2 arguments"
+      )
+    })
+  })
+  describe('not', () => {
+    const env = createGlobalEnv()
+
+    it('inverts boolean true to false', () => {
+      const notFn = env.getFunc('not')
+      if (notFn.kind !== 'builtin') return
+
+      const trueVal: LispValue = { type: 'boolean', value: true }
+      expect(notFn.fn([trueVal])).toEqual({ type: 'boolean', value: false })
+    })
+
+    it('inverts boolean false to true', () => {
+      const notFn = env.getFunc('not')
+      if (notFn.kind !== 'builtin') return
+
+      const falseVal: LispValue = { type: 'boolean', value: false }
+      expect(notFn.fn([falseVal])).toEqual({ type: 'boolean', value: true })
+    })
+
+    it('treats empty list () as falsey and returns true', () => {
+      const notFn = env.getFunc('not')
+      if (notFn.kind !== 'builtin') return
+
+      const emptyList: LispValue = { type: 'list', elements: [] }
+      expect(notFn.fn([emptyList])).toEqual({ type: 'boolean', value: true })
+    })
+
+    it('treats numbers, strings, and populated lists as truthy and returns false', () => {
+      const notFn = env.getFunc('not')
+      if (notFn.kind !== 'builtin') return
+
+      const num: LispValue = { type: 'number', value: 0 }
+      const str: LispValue = { type: 'string', value: '' }
+      const nonList: LispValue = { type: 'list', elements: [num] }
+
+      expect(notFn.fn([num])).toEqual({ type: 'boolean', value: false })
+      expect(notFn.fn([str])).toEqual({ type: 'boolean', value: false })
+      expect(notFn.fn([nonList])).toEqual({ type: 'boolean', value: false })
+    })
+
+    it('throws when given 0 or more than 1 argument', () => {
+      const notFn = env.getFunc('not')
+      if (notFn.kind !== 'builtin') return
+
+      expect(() => notFn.fn([])).toThrowError(
+        "'not' expects exactly 1 argument"
+      )
+      expect(() =>
+        notFn.fn([
+          { type: 'boolean', value: true },
+          { type: 'boolean', value: false },
+        ])
+      ).toThrowError("'not' expects exactly 1 argument")
     })
   })
 })
