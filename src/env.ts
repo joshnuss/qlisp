@@ -166,5 +166,12 @@ export function createGlobalEnv(): Env {
     return args[args.length - 1]!
   })
 
+  env.defineBuiltinFunc('list', (args: LispValue[]): LispValue => {
+    return {
+      type: 'list',
+      elements: args,
+    }
+  })
+
   return env
 }

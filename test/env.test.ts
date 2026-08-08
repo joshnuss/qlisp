@@ -133,4 +133,56 @@ describe('Env', () => {
       }
     })
   })
+  describe('list', () => {
+    it('creates an empty list when called with 0 arguments', () => {
+      const env = createGlobalEnv()
+      const listFn = env.getFunc('list')
+
+      if (listFn.kind === 'builtin') {
+        const result = listFn.fn([])
+        expect(result).toEqual({
+          type: 'list',
+          elements: [],
+        })
+      }
+    })
+
+    it('constructs a list from multiple evaluated arguments', () => {
+      const env = createGlobalEnv()
+      const listFn = env.getFunc('list')
+
+      const num: LispValue = { type: 'number', value: 1 }
+      const str: LispValue = { type: 'string', value: 'a' }
+      const bool: LispValue = { type: 'boolean', value: true }
+
+      if (listFn.kind === 'builtin') {
+        const result = listFn.fn([num, str, bool])
+
+        expect(result).toEqual({
+          type: 'list',
+          elements: [num, str, bool],
+        })
+      }
+    })
+
+    it('supports nested list structures', () => {
+      const env = createGlobalEnv()
+      const listFn = env.getFunc('list')
+
+      const innerList: LispValue = {
+        type: 'list',
+        elements: [{ type: 'number', value: 10 }],
+      }
+      const outerNum: LispValue = { type: 'number', value: 20 }
+
+      if (listFn.kind === 'builtin') {
+        const result = listFn.fn([innerList, outerNum])
+
+        expect(result).toEqual({
+          type: 'list',
+          elements: [innerList, outerNum],
+        })
+      }
+    })
+  })
 })
