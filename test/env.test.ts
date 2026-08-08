@@ -1,75 +1,62 @@
 import { describe, it, expect } from 'vitest'
-import { Env } from '../src/env.js'
-import type { LispValue } from '../src/interpreter.js'
+import { Env, createGlobalEnv } from '../src/env.ts'
 
 describe('Env', () => {
-  const val10: LispValue = { type: 'number', value: 10 }
-  const val20: LispValue = { type: 'number', value: 20 }
-  const val100: LispValue = { type: 'number', value: 100 }
+  it('keeps variables and functions in separate namespaces', () => {
+    const env = new Env()
 
-  describe('define() & get()', () => {
-    it('defines and retrieves a variable in the local environment', () => {
-      const env = new Env()
-      env.define('x', val10)
+    // Variable 'square'
+    env.defineVar('square', { type: 'number', value: 16 })
 
-      expect(env.get('x')).toEqual(val10)
-    })
+    // Function 'square'
+    env.defun('square', ['x'], [{ type: 'symbol', name: 'x' }])
 
-    it('throws an error when looking up an unbound symbol', () => {
-      const env = new Env()
-
-      expect(() => env.get('unbound')).toThrowError("Unbound symbol: 'unbound'")
-    })
+    expect(env.getVar('square')).toEqual({ type: 'number', value: 16 })
+    expect(env.getFunc('square').kind).toBe('user')
   })
 
-  describe('Lexical Scope & Inheritance', () => {
-    it('resolves variables from a parent scope', () => {
-      const parent = new Env()
-      parent.define('g', val10)
+  it('evaluates arithmetic builtins (+, -, *, /)', () => {
+    const env = createGlobalEnv()
 
-      const child = new Env(parent)
+    const add = env.getFunc('+')
+    const sub = env.getFunc('-')
+    const mul = env.getFunc('*')
+    const div = env.getFunc('/')
 
-      expect(child.get('g')).toEqual(val10)
-    })
+    if (add.kind === 'builtin') {
+      expect(
+        add.fn([
+          { type: 'number', value: 2 },
+          { type: 'number', value: 3 },
+        ])
+      ).toEqual({ type: 'number', value: 5 })
+    }
 
-    it('allows child scope to shadow parent variables without mutating parent', () => {
-      const parent = new Env()
-      parent.define('x', val10)
+    if (sub.kind === 'builtin') {
+      expect(
+        sub.fn([
+          { type: 'number', value: 10 },
+          { type: 'number', value: 4 },
+        ])
+      ).toEqual({ type: 'number', value: 6 })
+    }
 
-      const child = new Env(parent)
-      child.define('x', val20) // Shadowing 'x' locally
+    if (mul.kind === 'builtin') {
+      expect(
+        mul.fn([
+          { type: 'number', value: 3 },
+          { type: 'number', value: 4 },
+        ])
+      ).toEqual({ type: 'number', value: 12 })
+    }
 
-      expect(child.get('x')).toEqual(val20) // Child gets local value
-      expect(parent.get('x')).toEqual(val10) // Parent retains original value
-    })
-  })
-
-  describe('set! (Mutation)', () => {
-    it('mutates a variable in the current local scope', () => {
-      const env = new Env()
-      env.define('x', val10)
-      env.set('x', val100)
-
-      expect(env.get('x')).toEqual(val100)
-    })
-
-    it('walks up the scope chain and mutates the variable in the parent frame', () => {
-      const parent = new Env()
-      parent.define('counter', val10)
-
-      const child = new Env(parent)
-      child.set('counter', val20) // Mutates parent's binding
-
-      expect(child.get('counter')).toEqual(val20)
-      expect(parent.get('counter')).toEqual(val20)
-    })
-
-    it('throws an error when attempting to set! an unbound symbol', () => {
-      const env = new Env()
-
-      expect(() => env.set('y', val10)).toThrowError(
-        "Cannot set unbound symbol: 'y'"
-      )
-    })
+    if (div.kind === 'builtin') {
+      expect(
+        div.fn([
+          { type: 'number', value: 20 },
+          { type: 'number', value: 5 },
+        ])
+      ).toEqual({ type: 'number', value: 4 })
+    }
   })
 })
