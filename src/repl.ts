@@ -1,7 +1,8 @@
 import * as readline from 'node:readline'
 import { read, evalNodes, pretty } from './interpreter.ts'
+import type { Env } from './env.ts'
 
-export function start(): void {
+export function start(env: Env): void {
   let index = 1
 
   const rl = readline.createInterface({
@@ -24,7 +25,7 @@ export function start(): void {
     if (input.length > 0) {
       try {
         const ast = read(input)
-        const result = await evalNodes(ast)
+        const result = await evalNodes(ast, env)
 
         console.log(pretty(result))
 
