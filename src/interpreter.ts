@@ -148,7 +148,7 @@ export function pretty(val: LispValue): string {
       return `"${val.value}"`
 
     case 'boolean':
-      return val.value ? '#t' : '#f'
+      return val.value ? 't' : 'f'
 
     case 'symbol':
       return val.name

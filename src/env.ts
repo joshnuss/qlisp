@@ -1,4 +1,5 @@
 import type { ASTNode } from './ast.ts'
+import { pretty } from './interpreter.ts'
 
 export type BuiltinFn = (args: LispValue[]) => LispValue
 
@@ -152,6 +153,18 @@ export function createGlobalEnv(): Env {
       }
     )
   )
+
+  env.defineBuiltinFunc('write', (args: LispValue[]): LispValue => {
+    if (args.length === 0) {
+      throw new Error("'write' expects at least 1 argument")
+    }
+
+    const output = args.map(pretty).join(' ')
+    console.log(output)
+
+    // Return the last evaluated value (Standard Lisp behavior)
+    return args[args.length - 1]!
+  })
 
   return env
 }

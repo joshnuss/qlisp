@@ -134,8 +134,8 @@ describe('pretty()', () => {
   it('formats primitives correctly', () => {
     expect(pretty({ type: 'number', value: 60 })).toBe('60')
     expect(pretty({ type: 'string', value: 'hello' })).toBe('"hello"')
-    expect(pretty({ type: 'boolean', value: true })).toBe('#t')
-    expect(pretty({ type: 'boolean', value: false })).toBe('#f')
+    expect(pretty({ type: 'boolean', value: true })).toBe('t')
+    expect(pretty({ type: 'boolean', value: false })).toBe('f')
     expect(pretty({ type: 'symbol', name: 'foo' })).toBe('foo')
   })
 
