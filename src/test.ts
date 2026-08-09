@@ -1,8 +1,11 @@
-import { spawn } from 'node:child_process'
+import { execFile as execFileCb } from 'node:child_process'
 import { readdir, readFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
+import { promisify } from 'node:util'
 import path from 'node:path'
-import ora from 'ora'
+import ora, { type Ora } from 'ora'
+
+const execFile = promisify(execFileCb)
 
 interface RunResult {
   stdout: string
@@ -10,54 +13,73 @@ interface RunResult {
   code: number
 }
 
-function runTest(filePath: string): Promise<RunResult> {
-  const { promise, resolve } = Promise.withResolvers<RunResult>()
+async function execTest(filePath: string): Promise<RunResult> {
+  try {
+    const { stdout, stderr } = await execFile('bin/lisp', [filePath])
+    return { stdout, stderr, code: 0 }
+  } catch {
+    return { stdout: '', stderr: '', code: 1 }
+  }
+}
 
-  const child = spawn('bin/lisp', [filePath])
+function printSection(title: string, content: string): void {
+  console.log(`\n--- [${title}] ---`)
+  console.log(content.trimEnd())
+  console.log('-------------------------\n')
+}
 
-  let stdout = ''
-  let stderr = ''
+async function runTest(
+  file: string,
+  targetDir: string,
+  spinner: Ora
+): Promise<boolean> {
+  const testPath = path.join(targetDir, file)
+  const relativePath = path.relative(process.cwd(), testPath)
 
-  child.stdout.on('data', (chunk: Buffer | string) => {
-    stdout += chunk.toString()
-  })
+  spinner.text = `Running ${relativePath}`
 
-  child.stderr.on('data', (chunk: Buffer | string) => {
-    stderr += chunk.toString()
-  })
+  const { stdout, stderr, code } = await execTest(testPath)
 
-  child.on('error', (error: Error & { code?: number }) => {
-    resolve({
-      stdout,
-      stderr: stderr || error.message,
-      code: error.code ?? 1,
-    })
-  })
+  if (code !== 0) {
+    spinner.fail(relativePath)
+    console.log(`(non-zero exit code ${code})`)
 
-  child.on('close', (code: number) => {
-    resolve({
-      stdout,
-      stderr,
-      code,
-    })
-  })
+    if (stderr.trim()) {
+      printSection('stderr', stderr)
+    }
+    return false
+  }
 
-  return promise
+  const txtFile = file.replace(/\.lisp$/, '.txt')
+  const txtPath = path.join(targetDir, txtFile)
+
+  if (!existsSync(txtPath)) {
+    spinner.fail(relativePath)
+    console.log(`(missing expected output file: ${relativePath})`)
+    return false
+  }
+
+  const expected = await readFile(txtPath, 'utf-8')
+
+  if (stdout === expected) {
+    spinner.succeed(relativePath)
+    return true
+  }
+
+  spinner.fail(relativePath)
+
+  printSection('Expected', expected)
+  printSection('Actual', stdout)
+
+  return false
 }
 
 async function runAll(dirPath: string): Promise<void> {
   const targetDir = path.resolve(dirPath)
   const files = await readdir(targetDir)
-
   const testFiles = files.filter((name) => name.endsWith('.lisp')).sort()
 
-  if (testFiles.length === 0) {
-    console.log(`No .lisp files found in ${targetDir}`)
-    return
-  }
-
-  let passed = 0
-  let failed = 0
+  const stats = { passed: 0, failed: 0 }
 
   let spinner = ora({
     spinner: 'dots',
@@ -65,57 +87,20 @@ async function runAll(dirPath: string): Promise<void> {
   }).start()
 
   for (const file of testFiles) {
-    const testPath = path.join(targetDir, file)
-    const relativePath = path.relative(process.cwd(), testPath)
+    const pass = await runTest(file, targetDir, spinner)
 
-    spinner.text = `Running ${relativePath}`
-
-    const { stdout, stderr, code } = await runTest(testPath)
-
-    if (code !== 0) {
-      spinner.fail(relativePath)
-      console.log(`(non-zero exit code ${code})`)
-
-      if (stderr.trim()) {
-        console.log('\n--- [stderr] ---')
-        console.log(stderr.trim())
-        console.log('----------------\n')
-      }
-      failed++
-      continue
-    }
-
-    const txtFile = file.replace(/\.lisp$/, '.txt')
-    const txtPath = path.join(targetDir, txtFile)
-
-    if (!existsSync(txtPath)) {
-      spinner.fail(relativePath)
-      console.log(`(missing expected output file: ${relativePath})`)
-      failed++
-      continue
-    }
-
-    const expected = await readFile(txtPath, 'utf-8')
-
-    if (stdout === expected) {
-      spinner.succeed(relativePath)
-      passed++
+    if (pass) {
+      stats.passed++
     } else {
-      spinner.fail(relativePath)
-      console.log('\n--- [Expected] ---')
-      console.log(expected.trimEnd())
-      console.log('--- [Actual] -----')
-      console.log(stdout.trimEnd())
-      console.log('-------------------------\n')
-      failed++
+      stats.failed++
     }
 
     spinner = spinner.render()
   }
 
-  spinner.info(`Summary: ${passed} passed, ${failed} failed.`)
+  spinner.info(`Summary: ${stats.passed} passed, ${stats.failed} failed.`)
 
-  if (failed > 0) {
+  if (stats.failed > 0) {
     process.exit(1)
   }
 }
@@ -123,6 +108,6 @@ async function runAll(dirPath: string): Promise<void> {
 const dir = process.argv[2] || 'examples'
 
 runAll(dir).catch((err) => {
-  console.error('Fatal error running harness:', err)
+  console.error('Fatal error:', err)
   process.exit(1)
 })
