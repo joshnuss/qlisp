@@ -119,7 +119,7 @@ export class Env {
       this.parent.setVar(name, value)
       return
     }
-    throw new Error(`Cannot set unbound variable: '${name}'`)
+    throw new Error(`Cannot set unbound variable '${name}'`)
   }
 
   defmacro(name: string, params: string[], body: ASTNode[]): void {

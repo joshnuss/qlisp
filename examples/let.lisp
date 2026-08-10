@@ -1,4 +1,6 @@
 (let ((x 1)
       (y 2))
-  (+ x y)
+  (write (+ x y))
+  (set x 33)
+  x
 )

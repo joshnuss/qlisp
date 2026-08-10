@@ -52,6 +52,23 @@ export function evalNode(node: ASTNode, env: Env): LispValue {
       return evalLet(bindings, body, env)
     }
 
+    if (first?.type === 'symbol' && first.name === 'set') {
+      const [varNode, exprNode] = rest
+      if (varNode?.type !== 'symbol' || !exprNode) {
+        throw new Error(
+          "Syntax error: 'set!' requires a symbol and an expression"
+        )
+      }
+
+      // Evaluate the expression in the current environment
+      const newValue = evalNode(exprNode, env)
+
+      // Mutate the variable binding in the environment chain
+      env.setVar(varNode.name, newValue)
+
+      return newValue
+    }
+
     // Special form: (defmacro name (params...) body...)
     if (first?.type === 'symbol' && first.name === 'defmacro') {
       const [nameNode, paramsNode, ...body] = rest

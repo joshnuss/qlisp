@@ -9,7 +9,7 @@ import {
   type LispValue,
 } from '../src/interpreter.js'
 import { type ASTNode } from '../src/ast.ts'
-import { createGlobalEnv } from '../src/env.ts'
+import { createGlobalEnv, Env } from '../src/env.ts'
 
 describe('read()', () => {
   it('returns ast', () => {
@@ -228,6 +228,74 @@ describe('evalNodes()', () => {
 
       // Verify local vars didn't leak into global env
       expect(() => env.getVar('x')).toThrow()
+    })
+  })
+
+  describe('set', () => {
+    it('updates an existing variable in the global environment', () => {
+      const env = createGlobalEnv()
+      env.defineVar('count', { type: 'number', value: 1 })
+
+      // (set count (+ count 1))
+      const setAST: ASTNode = {
+        type: 'list',
+        elements: [
+          { type: 'symbol', name: 'set' },
+          { type: 'symbol', name: 'count' },
+          {
+            type: 'list',
+            elements: [
+              { type: 'symbol', name: '+' },
+              { type: 'symbol', name: 'count' },
+              { type: 'number', value: 1 },
+            ],
+          },
+        ],
+      }
+
+      const result = evalNode(setAST, env)
+
+      expect(result).toEqual({ type: 'number', value: 2 })
+      expect(env.getVar('count')).toEqual({ type: 'number', value: 2 })
+    })
+
+    it('updates a variable in an outer lexical environment from inside a child scope', () => {
+      const parentEnv = createGlobalEnv()
+      parentEnv.defineVar('x', { type: 'number', value: 100 })
+
+      const childEnv = new Env(parentEnv)
+
+      // (set x 200) evaluated in child scope
+      const setAST: ASTNode = {
+        type: 'list',
+        elements: [
+          { type: 'symbol', name: 'set' },
+          { type: 'symbol', name: 'x' },
+          { type: 'number', value: 200 },
+        ],
+      }
+
+      evalNode(setAST, childEnv)
+
+      // Verify parent env variable was updated
+      expect(parentEnv.getVar('x')).toEqual({ type: 'number', value: 200 })
+    })
+
+    it('throws an error when setting an unbound variable', () => {
+      const env = createGlobalEnv()
+
+      const setAST: ASTNode = {
+        type: 'list',
+        elements: [
+          { type: 'symbol', name: 'set' },
+          { type: 'symbol', name: 'unknown' },
+          { type: 'number', value: 5 },
+        ],
+      }
+
+      expect(() => evalNode(setAST, env)).toThrow(
+        "Cannot set unbound variable 'unknown'"
+      )
     })
   })
 })
