@@ -50,6 +50,12 @@ export function evalNode(node: ASTNode, env: Env): LispValue {
       return evalLet(bindings, body, env)
     }
 
+    // --- Special Form: (progn body...) ---
+    // Evaluates each form in sequence, in the current scope, returning the last value.
+    if (first?.type === 'symbol' && first.name === 'progn') {
+      return evalNodes(rest, env)
+    }
+
     if (first?.type === 'symbol' && first.name === 'quote') {
       const [target] = rest
       if (!target) throw new Error("'quote' requires exactly 1 argument")

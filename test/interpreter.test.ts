@@ -238,6 +238,43 @@ describe('evalNodes()', () => {
     })
   })
 
+  describe('progn', () => {
+    it('evaluates each form in sequence and returns the value of the last one', () => {
+      const env = createGlobalEnv()
+      const ast = read('(progn 1 2 3)')
+
+      expect(evalNodes(ast, env)).toEqual({ type: 'number', value: 3 })
+    })
+
+    it('returns boolean false for an empty progn', () => {
+      const env = createGlobalEnv()
+      const ast = read('(progn)')
+
+      expect(evalNodes(ast, env)).toEqual({ type: 'boolean', value: false })
+    })
+
+    it('evaluates forms in the current scope rather than a new one', () => {
+      const env = createGlobalEnv()
+      const ast = read(`
+        (progn (define x 1) (set x (+ x 1)))
+        x
+      `)
+
+      expect(evalNodes(ast, env)).toEqual({ type: 'number', value: 2 })
+    })
+
+    it('allows multiple forms inside a single if branch', () => {
+      const env = createGlobalEnv()
+      const ast = read(`
+        (if t
+          (progn (define a 1) (define b 2) (+ a b))
+          0)
+      `)
+
+      expect(evalNodes(ast, env)).toEqual({ type: 'number', value: 3 })
+    })
+  })
+
   describe('set', () => {
     it('updates an existing variable in the global environment', () => {
       const env = createGlobalEnv()
