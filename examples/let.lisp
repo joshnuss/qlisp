@@ -2,5 +2,11 @@
       (y 2))
   (write (+ x y))
   (set x 33)
-  x
+  (write x)
+)
+
+(let ((x 5))
+  (let ((y 2))
+    (+ x y)
+  )
 )
