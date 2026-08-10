@@ -271,6 +271,22 @@ export function createGlobalEnv(): Env {
   env.defineBuiltinFunc('cdr', cdrFn('cdr'))
   env.defineBuiltinFunc('rest', cdrFn('rest'))
 
+  env.defineBuiltinFunc('length', (args: LispValue[]): LispValue => {
+    if (args.length !== 1) {
+      throw new Error("'length' expects exactly 1 argument")
+    }
+
+    const [value] = args
+    if (value!.type === 'list') {
+      return { type: 'number', value: value!.elements.length }
+    }
+    if (value!.type === 'string') {
+      return { type: 'number', value: value!.value.length }
+    }
+
+    throw new Error("'length' expects a list or string argument")
+  })
+
   env.defineBuiltinFunc(
     '=',
     compareArgs('=', (a, b) => a === b)

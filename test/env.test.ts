@@ -395,6 +395,84 @@ describe('Env', () => {
     })
   })
 
+  describe('length', () => {
+    it('returns the number of elements in a list', () => {
+      const env = createGlobalEnv()
+      const lengthFn = env.getFunc('length')
+
+      const list: LispValue = {
+        type: 'list',
+        elements: [
+          { type: 'number', value: 1 },
+          { type: 'number', value: 2 },
+          { type: 'number', value: 3 },
+        ],
+      }
+
+      if (lengthFn.kind === 'builtin') {
+        expect(lengthFn.fn([list])).toEqual({ type: 'number', value: 3 })
+      }
+    })
+
+    it('returns 0 for an empty list', () => {
+      const env = createGlobalEnv()
+      const lengthFn = env.getFunc('length')
+
+      if (lengthFn.kind === 'builtin') {
+        expect(lengthFn.fn([{ type: 'list', elements: [] }])).toEqual({
+          type: 'number',
+          value: 0,
+        })
+      }
+    })
+
+    it('returns the number of characters in a string', () => {
+      const env = createGlobalEnv()
+      const lengthFn = env.getFunc('length')
+
+      if (lengthFn.kind === 'builtin') {
+        expect(lengthFn.fn([{ type: 'string', value: 'hello' }])).toEqual({
+          type: 'number',
+          value: 5,
+        })
+      }
+    })
+
+    it('returns 0 for an empty string', () => {
+      const env = createGlobalEnv()
+      const lengthFn = env.getFunc('length')
+
+      if (lengthFn.kind === 'builtin') {
+        expect(lengthFn.fn([{ type: 'string', value: '' }])).toEqual({
+          type: 'number',
+          value: 0,
+        })
+      }
+    })
+
+    it('throws when the argument is not a list or string', () => {
+      const env = createGlobalEnv()
+      const lengthFn = env.getFunc('length')
+
+      if (lengthFn.kind === 'builtin') {
+        expect(() => lengthFn.fn([{ type: 'number', value: 42 }])).toThrowError(
+          "'length' expects a list or string argument"
+        )
+      }
+    })
+
+    it('throws when not given exactly 1 argument', () => {
+      const env = createGlobalEnv()
+      const lengthFn = env.getFunc('length')
+
+      if (lengthFn.kind === 'builtin') {
+        expect(() => lengthFn.fn([])).toThrowError(
+          "'length' expects exactly 1 argument"
+        )
+      }
+    })
+  })
+
   describe('comparison builtins', () => {
     const env = createGlobalEnv()
 
