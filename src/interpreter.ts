@@ -56,7 +56,7 @@ export function evalNode(node: ASTNode, env: Env): LispValue {
       const [varNode, exprNode] = rest
       if (varNode?.type !== 'symbol' || !exprNode) {
         throw new Error(
-          "Syntax error: 'set!' requires a symbol and an expression"
+          "Syntax error: 'set' requires a symbol and an expression"
         )
       }
 
