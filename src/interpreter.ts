@@ -56,6 +56,13 @@ export function evalNode(node: ASTNode, env: Env): LispValue {
       return evalNodes(rest, env)
     }
 
+    // --- Special Form: (dolist (var list-expression) body...) ---
+    if (first?.type === 'symbol' && first.name === 'dolist') {
+      const [bindingNode, ...body] = rest
+      if (!bindingNode) throw new Error("'dolist' requires a binding form")
+      return evalDolist(bindingNode, body, env)
+    }
+
     if (first?.type === 'symbol' && first.name === 'quote') {
       const [target] = rest
       if (!target) throw new Error("'quote' requires exactly 1 argument")
@@ -343,6 +350,40 @@ function evalLet(bindingsNode: ASTNode, body: ASTNode[], env: Env): LispValue {
 
   // 3. Evaluate the body forms inside the child env
   return evalNodes(body, localEnv)
+}
+
+/**
+ * Evaluates (dolist (var list-expression) body...): binds `var` to each
+ * element of the evaluated list in turn, running body for side effects.
+ * Always returns boolean false (nil), since dolist is for side effects.
+ */
+function evalDolist(
+  bindingNode: ASTNode,
+  body: ASTNode[],
+  env: Env
+): LispValue {
+  if (bindingNode.type !== 'list' || bindingNode.elements.length !== 2) {
+    throw new Error("'dolist' binding form must be (var list-expression)")
+  }
+
+  const [varNode, listNode] = bindingNode.elements
+  if (varNode?.type !== 'symbol') {
+    throw new Error("'dolist' binding target must be a symbol")
+  }
+
+  const listVal = evalNode(listNode!, env)
+  if (listVal.type !== 'list') {
+    throw new Error("'dolist' expects a list expression")
+  }
+
+  const localEnv = new Env(env)
+
+  for (const element of listVal.elements) {
+    localEnv.defineVar(varNode.name, element)
+    evalNodes(body, localEnv)
+  }
+
+  return { type: 'boolean', value: false }
 }
 
 export function pretty(val: LispValue): string {

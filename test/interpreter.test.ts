@@ -275,6 +275,70 @@ describe('evalNodes()', () => {
     })
   })
 
+  describe('dolist', () => {
+    it('binds the variable to each element and runs the body for side effects', () => {
+      const env = createGlobalEnv()
+      const ast = read(`
+        (define total 0)
+        (dolist (x (list 1 2 3 4))
+          (set total (+ total x)))
+        total
+      `)
+
+      expect(evalNodes(ast, env)).toEqual({ type: 'number', value: 10 })
+    })
+
+    it('returns boolean false (nil)', () => {
+      const env = createGlobalEnv()
+      const ast = read('(dolist (x (list 1 2 3)) x)')
+
+      expect(evalNodes(ast, env)).toEqual({ type: 'boolean', value: false })
+    })
+
+    it('does not error and returns false when the list is empty', () => {
+      const env = createGlobalEnv()
+      const ast = read('(dolist (x (list)) x)')
+
+      expect(evalNodes(ast, env)).toEqual({ type: 'boolean', value: false })
+    })
+
+    it('does not leak the loop variable into the outer scope', () => {
+      const env = createGlobalEnv()
+      const ast = read('(dolist (x (list 1 2 3)) x)')
+
+      evalNodes(ast, env)
+
+      expect(() => env.getVar('x')).toThrow()
+    })
+
+    it('throws when the binding form is not (var list-expression)', () => {
+      const env = createGlobalEnv()
+      const ast = read('(dolist (x) x)')
+
+      expect(() => evalNodes(ast, env)).toThrowError(
+        "'dolist' binding form must be (var list-expression)"
+      )
+    })
+
+    it('throws when the binding target is not a symbol', () => {
+      const env = createGlobalEnv()
+      const ast = read('(dolist (1 (list 1 2)) 1)')
+
+      expect(() => evalNodes(ast, env)).toThrowError(
+        "'dolist' binding target must be a symbol"
+      )
+    })
+
+    it('throws when the list expression does not evaluate to a list', () => {
+      const env = createGlobalEnv()
+      const ast = read('(dolist (x 5) x)')
+
+      expect(() => evalNodes(ast, env)).toThrowError(
+        "'dolist' expects a list expression"
+      )
+    })
+  })
+
   describe('set', () => {
     it('updates an existing variable in the global environment', () => {
       const env = createGlobalEnv()
