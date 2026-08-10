@@ -148,14 +148,8 @@ export function evalNode(node: ASTNode, env: Env): LispValue {
       // 1. Evaluate ONLY the condition
       const condVal = evalNode(condNode, env)
 
-      // 2. Truthiness check: anything that is not boolean false or empty list '() is truthy
-      const isTruthy = !(
-        (condVal.type === 'boolean' && condVal.value === false) ||
-        (condVal.type === 'list' && condVal.elements.length === 0)
-      )
-
-      // 3. Evaluate ONLY the branch dictated by the condition
-      if (isTruthy) {
+      // 2. Evaluate ONLY the branch dictated by the condition
+      if (isTruthy(condVal)) {
         return evalNode(thenNode, env)
       } else if (elseNode) {
         return evalNode(elseNode, env)
@@ -163,6 +157,11 @@ export function evalNode(node: ASTNode, env: Env): LispValue {
         // Unhandled false branch evaluates to boolean false (or nil)
         return { type: 'boolean', value: false }
       }
+    }
+
+    // --- Special Form: (cond (test body...) (test body...) ...) ---
+    if (first?.type === 'symbol' && first.name === 'cond') {
+      return evalCond(rest, env)
     }
 
     // --- Special Form: (defun name (params...) body...) ---
@@ -335,6 +334,39 @@ function evalQuasiquote(node: ASTNode, env: Env, depth: number): LispValue {
   }
 
   return { type: 'list', elements }
+}
+
+// Truthiness check: anything that is not boolean false or empty list '() is truthy
+function isTruthy(val: LispValue): boolean {
+  return !(
+    (val.type === 'boolean' && val.value === false) ||
+    (val.type === 'list' && val.elements.length === 0)
+  )
+}
+
+/**
+ * Evaluates (cond (test body...) (test body...) ...): tries each clause's
+ * test in order, and for the first truthy one, evaluates its body and
+ * returns the last value. A clause with no body returns the test's value.
+ * Returns boolean false (nil) if no clause matches.
+ */
+function evalCond(clauses: ASTNode[], env: Env): LispValue {
+  for (const clause of clauses) {
+    if (clause.type !== 'list' || clause.elements.length === 0) {
+      throw new Error(
+        "'cond' clauses must be non-empty lists like (test body...)"
+      )
+    }
+
+    const [testNode, ...body] = clause.elements
+    const testVal = evalNode(testNode!, env)
+
+    if (isTruthy(testVal)) {
+      return body.length === 0 ? testVal : evalNodes(body, env)
+    }
+  }
+
+  return { type: 'boolean', value: false }
 }
 
 function evalLet(bindingsNode: ASTNode, body: ASTNode[], env: Env): LispValue {

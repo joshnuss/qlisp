@@ -442,6 +442,90 @@ describe('evalNodes()', () => {
     })
   })
 
+  describe('cond', () => {
+    it('evaluates the body of the first truthy clause', () => {
+      const env = createGlobalEnv()
+      const ast = read(`
+        (cond
+          ((= 1 2) "a")
+          ((= 1 1) "b")
+          (t "c"))
+      `)
+
+      expect(evalNodes(ast, env)).toEqual({ type: 'string', value: 'b' })
+    })
+
+    it('falls through to a default t clause', () => {
+      const env = createGlobalEnv()
+      const ast = read(`
+        (cond
+          ((= 1 2) "a")
+          (t "default"))
+      `)
+
+      expect(evalNodes(ast, env)).toEqual({ type: 'string', value: 'default' })
+    })
+
+    it('returns boolean false (nil) when no clause matches', () => {
+      const env = createGlobalEnv()
+      const ast = read(`
+        (cond
+          ((= 1 2) "a")
+          ((= 3 4) "b"))
+      `)
+
+      expect(evalNodes(ast, env)).toEqual({ type: 'boolean', value: false })
+    })
+
+    it('returns boolean false (nil) for an empty cond', () => {
+      const env = createGlobalEnv()
+      const ast = read('(cond)')
+
+      expect(evalNodes(ast, env)).toEqual({ type: 'boolean', value: false })
+    })
+
+    it('evaluates multiple body forms in a matched clause and returns the last', () => {
+      const env = createGlobalEnv()
+      const ast = read(`
+        (define total 0)
+        (cond
+          (t (set total 1) (set total (+ total 41))))
+        total
+      `)
+
+      expect(evalNodes(ast, env)).toEqual({ type: 'number', value: 42 })
+    })
+
+    it('returns the test value itself when a matched clause has no body', () => {
+      const env = createGlobalEnv()
+      const ast = read('(cond (nil) (5))')
+
+      expect(evalNodes(ast, env)).toEqual({ type: 'number', value: 5 })
+    })
+
+    it('does not evaluate clauses after the first match', () => {
+      const env = createGlobalEnv()
+      const ast = read(`
+        (define calls 0)
+        (cond
+          (t 1)
+          (t (set calls (+ calls 1))))
+        calls
+      `)
+
+      expect(evalNodes(ast, env)).toEqual({ type: 'number', value: 0 })
+    })
+
+    it('throws when a clause is not a non-empty list', () => {
+      const env = createGlobalEnv()
+      const ast = read('(cond 5)')
+
+      expect(() => evalNodes(ast, env)).toThrowError(
+        "'cond' clauses must be non-empty lists like (test body...)"
+      )
+    })
+  })
+
   describe('set', () => {
     it('updates an existing variable in the global environment', () => {
       const env = createGlobalEnv()
