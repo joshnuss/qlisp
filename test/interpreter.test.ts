@@ -236,6 +236,89 @@ describe('evalNodes()', () => {
       // Verify local vars didn't leak into global env
       expect(() => env.getVar('x')).toThrow()
     })
+
+    it('does not let later bindings see earlier ones (parallel binding)', () => {
+      const env = createGlobalEnv()
+      const ast = read('(let ((x 1) (y (+ x 1))) y)')
+
+      expect(() => evalNodes(ast, env)).toThrowError("Unbound variable: 'x'")
+    })
+  })
+
+  describe('let*', () => {
+    it('lets each binding refer to the ones bound before it', () => {
+      const env = createGlobalEnv()
+      const ast = read(`
+        (let* ((x 1) (y (+ x 1)) (z (+ y 1)))
+          (list x y z))
+      `)
+
+      expect(evalNodes(ast, env)).toEqual({
+        type: 'list',
+        elements: [
+          { type: 'number', value: 1 },
+          { type: 'number', value: 2 },
+          { type: 'number', value: 3 },
+        ],
+      })
+    })
+
+    it('does not leak bindings into the outer scope', () => {
+      const env = createGlobalEnv()
+      const ast = read('(let* ((x 1) (y (+ x 1))) y)')
+
+      evalNodes(ast, env)
+
+      expect(() => env.getVar('x')).toThrow()
+      expect(() => env.getVar('y')).toThrow()
+    })
+
+    it('shadows an outer variable without affecting it outside the let*', () => {
+      const env = createGlobalEnv()
+      const ast = read(`
+        (define x 100)
+        (let* ((x 1) (y (+ x 1))) y)
+      `)
+
+      expect(evalNodes(ast, env)).toEqual({ type: 'number', value: 2 })
+      expect(env.getVar('x')).toEqual({ type: 'number', value: 100 })
+    })
+
+    it('throws when the bindings list is missing', () => {
+      const env = createGlobalEnv()
+      const ast = read('(let*)')
+
+      expect(() => evalNodes(ast, env)).toThrowError(
+        "'let*' requires a bindings list"
+      )
+    })
+
+    it('throws when the bindings are not a list', () => {
+      const env = createGlobalEnv()
+      const ast = read('(let* x x)')
+
+      expect(() => evalNodes(ast, env)).toThrowError(
+        "'let*' bindings must be a list"
+      )
+    })
+
+    it('throws when a binding is not a (var val) pair', () => {
+      const env = createGlobalEnv()
+      const ast = read('(let* ((x)) x)')
+
+      expect(() => evalNodes(ast, env)).toThrowError(
+        'Each binding must be a pair like (var val)'
+      )
+    })
+
+    it('throws when a binding target is not a symbol', () => {
+      const env = createGlobalEnv()
+      const ast = read('(let* ((1 2)) 1)')
+
+      expect(() => evalNodes(ast, env)).toThrowError(
+        'Binding target must be a symbol'
+      )
+    })
   })
 
   describe('progn', () => {

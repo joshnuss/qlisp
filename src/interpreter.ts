@@ -51,6 +51,14 @@ export function evalNode(node: ASTNode, env: Env): LispValue {
       return evalLet(bindings, body, env)
     }
 
+    // --- Special Form: (let* ((var val) ...) body...) ---
+    // Like let, but each binding can see the ones bound before it.
+    if (first?.type === 'symbol' && first.name === 'let*') {
+      const [bindings, ...body] = rest
+      if (!bindings) throw new Error("'let*' requires a bindings list")
+      return evalLetStar(bindings, body, env)
+    }
+
     // --- Special Form: (progn body...) ---
     // Evaluates each form in sequence, in the current scope, returning the last value.
     if (first?.type === 'symbol' && first.name === 'progn') {
@@ -452,14 +460,38 @@ function evalOr(exprs: ASTNode[], env: Env): LispValue {
 }
 
 function evalLet(bindingsNode: ASTNode, body: ASTNode[], env: Env): LispValue {
+  return evalLetBindings(bindingsNode, body, env, 'let', false)
+}
+
+function evalLetStar(
+  bindingsNode: ASTNode,
+  body: ASTNode[],
+  env: Env
+): LispValue {
+  return evalLetBindings(bindingsNode, body, env, 'let*', true)
+}
+
+/**
+ * Shared implementation for `let` and `let*`. `let` evaluates every binding
+ * value in the outer env, so bindings can't see each other (parallel).
+ * `let*` evaluates each value in the accumulating local env instead, so
+ * later bindings can refer to earlier ones (sequential).
+ */
+function evalLetBindings(
+  bindingsNode: ASTNode,
+  body: ASTNode[],
+  env: Env,
+  formName: string,
+  sequential: boolean
+): LispValue {
   if (bindingsNode.type !== 'list') {
-    throw new Error("'let' bindings must be a list")
+    throw new Error(`'${formName}' bindings must be a list`)
   }
 
   // 1. Create a child environment inheriting from outer env
   const localEnv = new Env(env)
 
-  // 2. Evaluate all binding values in the OUTER env first
+  // 2. Evaluate each binding value, then bind it in the child env
   for (const binding of bindingsNode.elements) {
     if (binding.type !== 'list' || binding.elements.length !== 2) {
       throw new Error('Each binding must be a pair like (var val)')
@@ -470,8 +502,7 @@ function evalLet(bindingsNode: ASTNode, body: ASTNode[], env: Env): LispValue {
       throw new Error('Binding target must be a symbol')
     }
 
-    // Evaluate value in outer env (ensures parallel binding)
-    const val = evalNode(valNode!, env)
+    const val = evalNode(valNode!, sequential ? localEnv : env)
     localEnv.defineVar(varNode.name, val)
   }
 
