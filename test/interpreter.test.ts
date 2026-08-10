@@ -8,6 +8,7 @@ import {
   pretty,
   type LispValue,
 } from '../src/interpreter.js'
+import { type ASTNode } from '../src/ast.ts'
 import { createGlobalEnv } from '../src/env.ts'
 
 describe('read()', () => {
