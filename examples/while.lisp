@@ -1,0 +1,10 @@
+(define i 0)
+(while (< i 3)
+  (print i)
+  (set i (+ i 1)))
+
+(define total 0)
+(while (< i 8)
+  (set total (+ total i))
+  (set i (+ i 1)))
+(print total)

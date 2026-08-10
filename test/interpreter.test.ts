@@ -427,6 +427,63 @@ describe('evalNodes()', () => {
     })
   })
 
+  describe('while', () => {
+    it('runs the body while the test stays truthy, re-evaluating it each time', () => {
+      const env = createGlobalEnv()
+      const ast = read(`
+        (define i 0)
+        (define total 0)
+        (while (< i 5)
+          (set total (+ total i))
+          (set i (+ i 1)))
+        total
+      `)
+
+      expect(evalNodes(ast, env)).toEqual({ type: 'number', value: 10 })
+    })
+
+    it('never runs the body when the test starts out falsy', () => {
+      const env = createGlobalEnv()
+      const ast = read(`
+        (define calls 0)
+        (while nil (set calls (+ calls 1)))
+        calls
+      `)
+
+      expect(evalNodes(ast, env)).toEqual({ type: 'number', value: 0 })
+    })
+
+    it('returns boolean false (nil)', () => {
+      const env = createGlobalEnv()
+      const ast = read(`
+        (define i 0)
+        (while (< i 3) (set i (+ i 1)))
+      `)
+
+      expect(evalNodes(ast, env)).toEqual({ type: 'boolean', value: false })
+    })
+
+    it('runs the body in the current scope, not a new one', () => {
+      const env = createGlobalEnv()
+      const ast = read(`
+        (define i 0)
+        (while (< i 1) (define x 42) (set i (+ i 1)))
+        x
+      `)
+
+      expect(evalNodes(ast, env)).toEqual({ type: 'number', value: 42 })
+    })
+
+    it('throws when the test expression is missing', () => {
+      const env = createGlobalEnv()
+      const ast = read('(while)')
+
+      expect(() => evalNodes(ast, env)).toThrowError(
+        "'while' requires a test expression"
+      )
+    })
+  })
+
   describe('lambda', () => {
     it('creates a function value that can be called inline', () => {
       const env = createGlobalEnv()

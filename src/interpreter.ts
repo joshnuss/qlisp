@@ -71,6 +71,13 @@ export function evalNode(node: ASTNode, env: Env): LispValue {
       return evalDotimes(bindingNode, body, env)
     }
 
+    // --- Special Form: (while test body...) ---
+    if (first?.type === 'symbol' && first.name === 'while') {
+      const [testNode, ...body] = rest
+      if (!testNode) throw new Error("'while' requires a test expression")
+      return evalWhile(testNode, body, env)
+    }
+
     // --- Special Form: (lambda (params...) body...) ---
     // Returns a first-class function value closing over the current scope.
     if (first?.type === 'symbol' && first.name === 'lambda') {
@@ -535,6 +542,19 @@ function evalDotimes(
   for (let i = 0; i < countVal.value; i++) {
     localEnv.defineVar(varNode.name, { type: 'number', value: i })
     evalNodes(body, localEnv)
+  }
+
+  return { type: 'boolean', value: false }
+}
+
+/**
+ * Evaluates (while test body...): re-evaluates `test` before each
+ * iteration and runs body for side effects as long as it stays truthy.
+ * Always returns boolean false (nil).
+ */
+function evalWhile(testNode: ASTNode, body: ASTNode[], env: Env): LispValue {
+  while (isTruthy(evalNode(testNode, env))) {
+    evalNodes(body, env)
   }
 
   return { type: 'boolean', value: false }
