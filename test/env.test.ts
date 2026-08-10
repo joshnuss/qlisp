@@ -433,9 +433,9 @@ describe('Env', () => {
       const lastFn = env.getFunc('last')
 
       if (lastFn.kind === 'builtin') {
-        expect(() =>
-          lastFn.fn([{ type: 'list', elements: [] }])
-        ).toThrowError("'last' cannot operate on an empty list")
+        expect(() => lastFn.fn([{ type: 'list', elements: [] }])).toThrowError(
+          "'last' cannot operate on an empty list"
+        )
       }
     })
 
@@ -444,9 +444,9 @@ describe('Env', () => {
       const lastFn = env.getFunc('last')
 
       if (lastFn.kind === 'builtin') {
-        expect(() =>
-          lastFn.fn([{ type: 'string', value: 'x' }])
-        ).toThrowError("'last' expects a list argument")
+        expect(() => lastFn.fn([{ type: 'string', value: 'x' }])).toThrowError(
+          "'last' expects a list argument"
+        )
       }
     })
 
