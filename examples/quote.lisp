@@ -1,7 +1,7 @@
 ; full form
-(write (quote foo))
-(write (quote (1 2 3)))
+(print (quote foo))
+(print (quote (1 2 3)))
 
 ; shorthand: '
-(write 'foo)
-(write '(1 2 3))
+(print 'foo)
+(print '(1 2 3))

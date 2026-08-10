@@ -65,16 +65,16 @@ describe('Env', () => {
     }
   })
 
-  describe('write', () => {
+  describe('print', () => {
     it('prints a single primitive value and returns it', () => {
       const env = createGlobalEnv()
-      const writeFn = env.getFunc('write')
+      const printFn = env.getFunc('print')
 
       const spy = vi.spyOn(console, 'log').mockImplementation(() => {})
 
       const numVal: LispValue = { type: 'number', value: 42 }
-      if (writeFn.kind === 'builtin') {
-        const result = writeFn.fn([numVal])
+      if (printFn.kind === 'builtin') {
+        const result = printFn.fn([numVal])
 
         expect(spy).toHaveBeenCalledWith('42')
         expect(result).toEqual(numVal)
@@ -85,7 +85,7 @@ describe('Env', () => {
 
     it('prints strings, booleans, symbols, and nested lists correctly', () => {
       const env = createGlobalEnv()
-      const writeFn = env.getFunc('write')
+      const printFn = env.getFunc('print')
 
       const spy = vi.spyOn(console, 'log').mockImplementation(() => {})
 
@@ -99,8 +99,8 @@ describe('Env', () => {
         ],
       }
 
-      if (writeFn.kind === 'builtin') {
-        writeFn.fn([listVal])
+      if (printFn.kind === 'builtin') {
+        printFn.fn([listVal])
         expect(spy).toHaveBeenCalledWith('(+ 1 t "hello")')
       }
 
@@ -109,15 +109,15 @@ describe('Env', () => {
 
     it('handles multiple arguments, printing space-separated values and returning the last argument', () => {
       const env = createGlobalEnv()
-      const writeFn = env.getFunc('write')
+      const printFn = env.getFunc('print')
 
       const spy = vi.spyOn(console, 'log').mockImplementation(() => {})
 
       const arg1: LispValue = { type: 'string', value: 'Result:' }
       const arg2: LispValue = { type: 'number', value: 100 }
 
-      if (writeFn.kind === 'builtin') {
-        const result = writeFn.fn([arg1, arg2])
+      if (printFn.kind === 'builtin') {
+        const result = printFn.fn([arg1, arg2])
 
         expect(spy).toHaveBeenCalledWith('"Result:" 100')
         expect(result).toEqual(arg2)
@@ -128,11 +128,11 @@ describe('Env', () => {
 
     it('throws an error when called with zero arguments', () => {
       const env = createGlobalEnv()
-      const writeFn = env.getFunc('write')
+      const printFn = env.getFunc('print')
 
-      if (writeFn.kind === 'builtin') {
-        expect(() => writeFn.fn([])).toThrowError(
-          "'write' expects at least 1 argument"
+      if (printFn.kind === 'builtin') {
+        expect(() => printFn.fn([])).toThrowError(
+          "'print' expects at least 1 argument"
         )
       }
     })

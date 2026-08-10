@@ -1,5 +1,5 @@
 ; full form
-(write (quasiquote (a b c)))
+(print (quasiquote (a b c)))
 
 ; shorthand: `
-(write `(a b c))
+(print `(a b c))

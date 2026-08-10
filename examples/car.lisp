@@ -1,4 +1,4 @@
-(write (car (list 1 2 3)))
+(print (car (list 1 2 3)))
 
 ; alias
-(write (first (list 1 2 3)))
+(print (first (list 1 2 3)))

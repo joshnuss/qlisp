@@ -251,9 +251,9 @@ export function createGlobalEnv(): Env {
     )
   )
 
-  env.defineBuiltinFunc('write', (args: LispValue[]): LispValue => {
+  env.defineBuiltinFunc('print', (args: LispValue[]): LispValue => {
     if (args.length === 0) {
-      throw new Error("'write' expects at least 1 argument")
+      throw new Error("'print' expects at least 1 argument")
     }
 
     const output = args.map(pretty).join(' ')

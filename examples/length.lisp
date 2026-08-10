@@ -1,4 +1,4 @@
-(write (length (list 1 2 3)))
-(write (length (list)))
-(write (length "hello"))
-(write (length ""))
+(print (length (list 1 2 3)))
+(print (length (list)))
+(print (length "hello"))
+(print (length ""))

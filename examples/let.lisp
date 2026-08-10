@@ -1,8 +1,8 @@
 (let ((x 1)
       (y 2))
-  (write (+ x y))
+  (print (+ x y))
   (set x 33)
-  (write x)
+  (print x)
 )
 
 (let ((x 5))
