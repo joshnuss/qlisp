@@ -339,6 +339,94 @@ describe('evalNodes()', () => {
     })
   })
 
+  describe('dotimes', () => {
+    it('binds the variable to each integer from 0 up to (but not including) the count', () => {
+      const env = createGlobalEnv()
+      const ast = read(`
+        (define seen (list))
+        (dotimes (i 4)
+          (set seen (cons i seen)))
+        seen
+      `)
+
+      expect(evalNodes(ast, env)).toEqual({
+        type: 'list',
+        elements: [
+          { type: 'number', value: 3 },
+          { type: 'number', value: 2 },
+          { type: 'number', value: 1 },
+          { type: 'number', value: 0 },
+        ],
+      })
+    })
+
+    it('runs the body for side effects', () => {
+      const env = createGlobalEnv()
+      const ast = read(`
+        (define total 0)
+        (dotimes (i 5)
+          (set total (+ total i)))
+        total
+      `)
+
+      expect(evalNodes(ast, env)).toEqual({ type: 'number', value: 10 })
+    })
+
+    it('returns boolean false (nil)', () => {
+      const env = createGlobalEnv()
+      const ast = read('(dotimes (i 3) i)')
+
+      expect(evalNodes(ast, env)).toEqual({ type: 'boolean', value: false })
+    })
+
+    it('does not error and returns false when the count is 0', () => {
+      const env = createGlobalEnv()
+      const ast = read(`
+        (define calls 0)
+        (dotimes (i 0) (set calls (+ calls 1)))
+        calls
+      `)
+
+      expect(evalNodes(ast, env)).toEqual({ type: 'number', value: 0 })
+    })
+
+    it('does not leak the loop variable into the outer scope', () => {
+      const env = createGlobalEnv()
+      const ast = read('(dotimes (i 3) i)')
+
+      evalNodes(ast, env)
+
+      expect(() => env.getVar('i')).toThrow()
+    })
+
+    it('throws when the binding form is not (var count-expression)', () => {
+      const env = createGlobalEnv()
+      const ast = read('(dotimes (i) i)')
+
+      expect(() => evalNodes(ast, env)).toThrowError(
+        "'dotimes' binding form must be (var count-expression)"
+      )
+    })
+
+    it('throws when the binding target is not a symbol', () => {
+      const env = createGlobalEnv()
+      const ast = read('(dotimes (1 3) 1)')
+
+      expect(() => evalNodes(ast, env)).toThrowError(
+        "'dotimes' binding target must be a symbol"
+      )
+    })
+
+    it('throws when the count expression does not evaluate to a number', () => {
+      const env = createGlobalEnv()
+      const ast = read('(dotimes (i "x") i)')
+
+      expect(() => evalNodes(ast, env)).toThrowError(
+        "'dotimes' expects a number expression"
+      )
+    })
+  })
+
   describe('lambda', () => {
     it('creates a function value that can be called inline', () => {
       const env = createGlobalEnv()

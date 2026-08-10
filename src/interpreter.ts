@@ -64,6 +64,13 @@ export function evalNode(node: ASTNode, env: Env): LispValue {
       return evalDolist(bindingNode, body, env)
     }
 
+    // --- Special Form: (dotimes (var count-expression) body...) ---
+    if (first?.type === 'symbol' && first.name === 'dotimes') {
+      const [bindingNode, ...body] = rest
+      if (!bindingNode) throw new Error("'dotimes' requires a binding form")
+      return evalDotimes(bindingNode, body, env)
+    }
+
     // --- Special Form: (lambda (params...) body...) ---
     // Returns a first-class function value closing over the current scope.
     if (first?.type === 'symbol' && first.name === 'lambda') {
@@ -493,6 +500,40 @@ function evalDolist(
 
   for (const element of listVal.elements) {
     localEnv.defineVar(varNode.name, element)
+    evalNodes(body, localEnv)
+  }
+
+  return { type: 'boolean', value: false }
+}
+
+/**
+ * Evaluates (dotimes (var count-expression) body...): binds `var` to each
+ * integer from 0 up to (but not including) the evaluated count, running
+ * body for side effects. Always returns boolean false (nil).
+ */
+function evalDotimes(
+  bindingNode: ASTNode,
+  body: ASTNode[],
+  env: Env
+): LispValue {
+  if (bindingNode.type !== 'list' || bindingNode.elements.length !== 2) {
+    throw new Error("'dotimes' binding form must be (var count-expression)")
+  }
+
+  const [varNode, countNode] = bindingNode.elements
+  if (varNode?.type !== 'symbol') {
+    throw new Error("'dotimes' binding target must be a symbol")
+  }
+
+  const countVal = evalNode(countNode!, env)
+  if (countVal.type !== 'number') {
+    throw new Error("'dotimes' expects a number expression")
+  }
+
+  const localEnv = new Env(env)
+
+  for (let i = 0; i < countVal.value; i++) {
+    localEnv.defineVar(varNode.name, { type: 'number', value: i })
     evalNodes(body, localEnv)
   }
 
