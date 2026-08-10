@@ -263,6 +263,18 @@ export function createGlobalEnv(): Env {
     return args[args.length - 1]!
   })
 
+  env.defineBuiltinFunc('write', (args: LispValue[]): LispValue => {
+    if (args.length === 0) {
+      throw new Error("'write' expects at least 1 argument")
+    }
+
+    const output = args.map(pretty).join(' ')
+    process.stdout.write(output)
+
+    // Return the last evaluated value (Standard Lisp behavior)
+    return args[args.length - 1]!
+  })
+
   env.defineBuiltinFunc('list', (args: LispValue[]): LispValue => {
     return {
       type: 'list',

@@ -137,6 +137,104 @@ describe('Env', () => {
       }
     })
   })
+
+  describe('write', () => {
+    it('writes a single primitive value and returns it', () => {
+      const env = createGlobalEnv()
+      const writeFn = env.getFunc('write')
+
+      const spy = vi
+        .spyOn(process.stdout, 'write')
+        .mockImplementation(() => true)
+
+      const numVal: LispValue = { type: 'number', value: 42 }
+      if (writeFn.kind === 'builtin') {
+        const result = writeFn.fn([numVal])
+
+        expect(spy).toHaveBeenCalledWith('42')
+        expect(result).toEqual(numVal)
+      }
+
+      spy.mockRestore()
+    })
+
+    it('writes strings, booleans, symbols, and nested lists correctly', () => {
+      const env = createGlobalEnv()
+      const writeFn = env.getFunc('write')
+
+      const spy = vi
+        .spyOn(process.stdout, 'write')
+        .mockImplementation(() => true)
+
+      const listVal: LispValue = {
+        type: 'list',
+        elements: [
+          { type: 'symbol', name: '+' },
+          { type: 'number', value: 1 },
+          { type: 'boolean', value: true },
+          { type: 'string', value: 'hello' },
+        ],
+      }
+
+      if (writeFn.kind === 'builtin') {
+        writeFn.fn([listVal])
+        expect(spy).toHaveBeenCalledWith('(+ 1 t "hello")')
+      }
+
+      spy.mockRestore()
+    })
+
+    it('handles multiple arguments, writing space-separated values and returning the last argument', () => {
+      const env = createGlobalEnv()
+      const writeFn = env.getFunc('write')
+
+      const spy = vi
+        .spyOn(process.stdout, 'write')
+        .mockImplementation(() => true)
+
+      const arg1: LispValue = { type: 'string', value: 'Result:' }
+      const arg2: LispValue = { type: 'number', value: 100 }
+
+      if (writeFn.kind === 'builtin') {
+        const result = writeFn.fn([arg1, arg2])
+
+        expect(spy).toHaveBeenCalledWith('"Result:" 100')
+        expect(result).toEqual(arg2)
+      }
+
+      spy.mockRestore()
+    })
+
+    it('does not append a trailing newline, unlike print', () => {
+      const env = createGlobalEnv()
+      const writeFn = env.getFunc('write')
+
+      const spy = vi
+        .spyOn(process.stdout, 'write')
+        .mockImplementation(() => true)
+
+      if (writeFn.kind === 'builtin') {
+        writeFn.fn([{ type: 'number', value: 1 }])
+        writeFn.fn([{ type: 'number', value: 2 }])
+
+        expect(spy).toHaveBeenNthCalledWith(1, '1')
+        expect(spy).toHaveBeenNthCalledWith(2, '2')
+      }
+
+      spy.mockRestore()
+    })
+
+    it('throws an error when called with zero arguments', () => {
+      const env = createGlobalEnv()
+      const writeFn = env.getFunc('write')
+
+      if (writeFn.kind === 'builtin') {
+        expect(() => writeFn.fn([])).toThrowError(
+          "'write' expects at least 1 argument"
+        )
+      }
+    })
+  })
   describe('list', () => {
     it('creates an empty list when called with 0 arguments', () => {
       const env = createGlobalEnv()
