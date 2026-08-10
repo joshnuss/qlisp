@@ -594,6 +594,78 @@ describe('evalNodes()', () => {
     })
   })
 
+  describe('when', () => {
+    it('evaluates the body and returns the last value when the test is truthy', () => {
+      const env = createGlobalEnv()
+      const ast = read('(when t 1 2 3)')
+
+      expect(evalNodes(ast, env)).toEqual({ type: 'number', value: 3 })
+    })
+
+    it('does not evaluate the body when the test is falsy, and returns nil', () => {
+      const env = createGlobalEnv()
+      const ast = read(`
+        (define calls 0)
+        (when nil (set calls (+ calls 1)))
+        calls
+      `)
+
+      expect(evalNodes(ast, env)).toEqual({ type: 'number', value: 0 })
+    })
+
+    it('returns boolean false (nil) when the test is falsy', () => {
+      const env = createGlobalEnv()
+      const ast = read('(when nil 1)')
+
+      expect(evalNodes(ast, env)).toEqual({ type: 'boolean', value: false })
+    })
+
+    it('throws when the test expression is missing', () => {
+      const env = createGlobalEnv()
+      const ast = read('(when)')
+
+      expect(() => evalNodes(ast, env)).toThrowError(
+        "'when' requires a test expression"
+      )
+    })
+  })
+
+  describe('unless', () => {
+    it('evaluates the body and returns the last value when the test is falsy', () => {
+      const env = createGlobalEnv()
+      const ast = read('(unless nil 1 2 3)')
+
+      expect(evalNodes(ast, env)).toEqual({ type: 'number', value: 3 })
+    })
+
+    it('does not evaluate the body when the test is truthy, and returns nil', () => {
+      const env = createGlobalEnv()
+      const ast = read(`
+        (define calls 0)
+        (unless t (set calls (+ calls 1)))
+        calls
+      `)
+
+      expect(evalNodes(ast, env)).toEqual({ type: 'number', value: 0 })
+    })
+
+    it('returns boolean false (nil) when the test is truthy', () => {
+      const env = createGlobalEnv()
+      const ast = read('(unless t 1)')
+
+      expect(evalNodes(ast, env)).toEqual({ type: 'boolean', value: false })
+    })
+
+    it('throws when the test expression is missing', () => {
+      const env = createGlobalEnv()
+      const ast = read('(unless)')
+
+      expect(() => evalNodes(ast, env)).toThrowError(
+        "'unless' requires a test expression"
+      )
+    })
+  })
+
   describe('set', () => {
     it('updates an existing variable in the global environment', () => {
       const env = createGlobalEnv()

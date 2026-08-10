@@ -176,6 +176,28 @@ export function evalNode(node: ASTNode, env: Env): LispValue {
       return evalOr(rest, env)
     }
 
+    // --- Special Form: (when test body...) ---
+    // Evaluates body (implicit progn) only if test is truthy.
+    if (first?.type === 'symbol' && first.name === 'when') {
+      const [testNode, ...body] = rest
+      if (!testNode) throw new Error("'when' requires a test expression")
+
+      return isTruthy(evalNode(testNode, env))
+        ? evalNodes(body, env)
+        : { type: 'boolean', value: false }
+    }
+
+    // --- Special Form: (unless test body...) ---
+    // Evaluates body (implicit progn) only if test is falsy.
+    if (first?.type === 'symbol' && first.name === 'unless') {
+      const [testNode, ...body] = rest
+      if (!testNode) throw new Error("'unless' requires a test expression")
+
+      return isTruthy(evalNode(testNode, env))
+        ? { type: 'boolean', value: false }
+        : evalNodes(body, env)
+    }
+
     // --- Special Form: (defun name (params...) body...) ---
     if (first?.type === 'symbol' && first.name === 'defun') {
       const [nameNode, paramsNode, ...bodyNodes] = rest
