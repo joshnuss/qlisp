@@ -189,6 +189,212 @@ describe('Env', () => {
       }
     })
   })
+  describe('cons', () => {
+    it('prepends an element onto a list', () => {
+      const env = createGlobalEnv()
+      const consFn = env.getFunc('cons')
+
+      const head: LispValue = { type: 'number', value: 1 }
+      const tail: LispValue = {
+        type: 'list',
+        elements: [
+          { type: 'number', value: 2 },
+          { type: 'number', value: 3 },
+        ],
+      }
+
+      if (consFn.kind === 'builtin') {
+        expect(consFn.fn([head, tail])).toEqual({
+          type: 'list',
+          elements: [
+            { type: 'number', value: 1 },
+            { type: 'number', value: 2 },
+            { type: 'number', value: 3 },
+          ],
+        })
+      }
+    })
+
+    it('prepends onto an empty list', () => {
+      const env = createGlobalEnv()
+      const consFn = env.getFunc('cons')
+
+      if (consFn.kind === 'builtin') {
+        const result = consFn.fn([
+          { type: 'number', value: 1 },
+          { type: 'list', elements: [] },
+        ])
+        expect(result).toEqual({
+          type: 'list',
+          elements: [{ type: 'number', value: 1 }],
+        })
+      }
+    })
+
+    it('throws when the second argument is not a list', () => {
+      const env = createGlobalEnv()
+      const consFn = env.getFunc('cons')
+
+      if (consFn.kind === 'builtin') {
+        expect(() =>
+          consFn.fn([
+            { type: 'number', value: 1 },
+            { type: 'number', value: 2 },
+          ])
+        ).toThrowError("'cons' second argument must be a list")
+      }
+    })
+
+    it('throws when not given exactly 2 arguments', () => {
+      const env = createGlobalEnv()
+      const consFn = env.getFunc('cons')
+
+      if (consFn.kind === 'builtin') {
+        expect(() => consFn.fn([{ type: 'number', value: 1 }])).toThrowError(
+          "'cons' expects exactly 2 arguments"
+        )
+      }
+    })
+  })
+
+  describe('car / first', () => {
+    const list: LispValue = {
+      type: 'list',
+      elements: [
+        { type: 'number', value: 1 },
+        { type: 'number', value: 2 },
+        { type: 'number', value: 3 },
+      ],
+    }
+
+    it('returns the first element of a list', () => {
+      const env = createGlobalEnv()
+      const carFn = env.getFunc('car')
+
+      if (carFn.kind === 'builtin') {
+        expect(carFn.fn([list])).toEqual({ type: 'number', value: 1 })
+      }
+    })
+
+    it('is aliased as first', () => {
+      const env = createGlobalEnv()
+      const firstFn = env.getFunc('first')
+
+      if (firstFn.kind === 'builtin') {
+        expect(firstFn.fn([list])).toEqual({ type: 'number', value: 1 })
+      }
+    })
+
+    it('throws on an empty list', () => {
+      const env = createGlobalEnv()
+      const carFn = env.getFunc('car')
+
+      if (carFn.kind === 'builtin') {
+        expect(() => carFn.fn([{ type: 'list', elements: [] }])).toThrowError(
+          "'car' cannot operate on an empty list"
+        )
+      }
+    })
+
+    it('throws when the argument is not a list', () => {
+      const env = createGlobalEnv()
+      const carFn = env.getFunc('car')
+
+      if (carFn.kind === 'builtin') {
+        expect(() => carFn.fn([{ type: 'number', value: 1 }])).toThrowError(
+          "'car' expects a list argument"
+        )
+      }
+    })
+
+    it('throws when not given exactly 1 argument', () => {
+      const env = createGlobalEnv()
+      const carFn = env.getFunc('car')
+
+      if (carFn.kind === 'builtin') {
+        expect(() => carFn.fn([])).toThrowError(
+          "'car' expects exactly 1 argument"
+        )
+      }
+    })
+  })
+
+  describe('cdr / rest', () => {
+    const list: LispValue = {
+      type: 'list',
+      elements: [
+        { type: 'number', value: 1 },
+        { type: 'number', value: 2 },
+        { type: 'number', value: 3 },
+      ],
+    }
+
+    it('returns all but the first element of a list', () => {
+      const env = createGlobalEnv()
+      const cdrFn = env.getFunc('cdr')
+
+      if (cdrFn.kind === 'builtin') {
+        expect(cdrFn.fn([list])).toEqual({
+          type: 'list',
+          elements: [
+            { type: 'number', value: 2 },
+            { type: 'number', value: 3 },
+          ],
+        })
+      }
+    })
+
+    it('is aliased as rest', () => {
+      const env = createGlobalEnv()
+      const restFn = env.getFunc('rest')
+
+      if (restFn.kind === 'builtin') {
+        expect(restFn.fn([list])).toEqual({
+          type: 'list',
+          elements: [
+            { type: 'number', value: 2 },
+            { type: 'number', value: 3 },
+          ],
+        })
+      }
+    })
+
+    it('returns an empty list when given a single-element list', () => {
+      const env = createGlobalEnv()
+      const cdrFn = env.getFunc('cdr')
+
+      if (cdrFn.kind === 'builtin') {
+        const singleton: LispValue = {
+          type: 'list',
+          elements: [{ type: 'number', value: 1 }],
+        }
+        expect(cdrFn.fn([singleton])).toEqual({ type: 'list', elements: [] })
+      }
+    })
+
+    it('throws on an empty list', () => {
+      const env = createGlobalEnv()
+      const cdrFn = env.getFunc('cdr')
+
+      if (cdrFn.kind === 'builtin') {
+        expect(() => cdrFn.fn([{ type: 'list', elements: [] }])).toThrowError(
+          "'cdr' cannot operate on an empty list"
+        )
+      }
+    })
+
+    it('throws when the argument is not a list', () => {
+      const env = createGlobalEnv()
+      const cdrFn = env.getFunc('cdr')
+
+      if (cdrFn.kind === 'builtin') {
+        expect(() => cdrFn.fn([{ type: 'string', value: 'x' }])).toThrowError(
+          "'cdr' expects a list argument"
+        )
+      }
+    })
+  })
+
   describe('comparison builtins', () => {
     const env = createGlobalEnv()
 

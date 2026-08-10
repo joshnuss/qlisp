@@ -81,6 +81,42 @@ function compareArgs(
   }
 }
 
+function carFn(name: string): BuiltinFn {
+  return (args: LispValue[]): LispValue => {
+    if (args.length !== 1) {
+      throw new Error(`'${name}' expects exactly 1 argument`)
+    }
+
+    const [list] = args
+    if (list!.type !== 'list') {
+      throw new Error(`'${name}' expects a list argument`)
+    }
+    if (list!.elements.length === 0) {
+      throw new Error(`'${name}' cannot operate on an empty list`)
+    }
+
+    return list!.elements[0]!
+  }
+}
+
+function cdrFn(name: string): BuiltinFn {
+  return (args: LispValue[]): LispValue => {
+    if (args.length !== 1) {
+      throw new Error(`'${name}' expects exactly 1 argument`)
+    }
+
+    const [list] = args
+    if (list!.type !== 'list') {
+      throw new Error(`'${name}' expects a list argument`)
+    }
+    if (list!.elements.length === 0) {
+      throw new Error(`'${name}' cannot operate on an empty list`)
+    }
+
+    return { type: 'list', elements: list!.elements.slice(1) }
+  }
+}
+
 export class Env {
   public parent: Env | null
 
@@ -216,6 +252,24 @@ export function createGlobalEnv(): Env {
       elements: args,
     }
   })
+
+  env.defineBuiltinFunc('cons', (args: LispValue[]): LispValue => {
+    if (args.length !== 2) {
+      throw new Error("'cons' expects exactly 2 arguments")
+    }
+
+    const [head, tail] = args
+    if (tail!.type !== 'list') {
+      throw new Error("'cons' second argument must be a list")
+    }
+
+    return { type: 'list', elements: [head!, ...tail!.elements] }
+  })
+
+  env.defineBuiltinFunc('car', carFn('car'))
+  env.defineBuiltinFunc('first', carFn('first'))
+  env.defineBuiltinFunc('cdr', cdrFn('cdr'))
+  env.defineBuiltinFunc('rest', cdrFn('rest'))
 
   env.defineBuiltinFunc(
     '=',
