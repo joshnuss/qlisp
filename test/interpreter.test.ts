@@ -180,6 +180,55 @@ describe('evalNodes()', () => {
       )
     })
   })
+
+  describe('let', () => {
+    it('creates local scope and evaluates body', () => {
+      const env = createGlobalEnv()
+      env.defineVar('global', { type: 'number', value: 10 })
+
+      // (let ((x 5) (y 2)) (+ x y global))
+      const letAST: ASTNode = {
+        type: 'list',
+        elements: [
+          { type: 'symbol', name: 'let' },
+          {
+            type: 'list',
+            elements: [
+              {
+                type: 'list',
+                elements: [
+                  { type: 'symbol', name: 'x' },
+                  { type: 'number', value: 5 },
+                ],
+              },
+              {
+                type: 'list',
+                elements: [
+                  { type: 'symbol', name: 'y' },
+                  { type: 'number', value: 2 },
+                ],
+              },
+            ],
+          },
+          {
+            type: 'list',
+            elements: [
+              { type: 'symbol', name: '+' },
+              { type: 'symbol', name: 'x' },
+              { type: 'symbol', name: 'y' },
+              { type: 'symbol', name: 'global' },
+            ],
+          },
+        ],
+      }
+
+      const result = evalNode(letAST, env)
+      expect(result).toEqual({ type: 'number', value: 17 })
+
+      // Verify local vars didn't leak into global env
+      expect(() => env.getVar('x')).toThrow()
+    })
+  })
 })
 
 describe('evalFile()', () => {

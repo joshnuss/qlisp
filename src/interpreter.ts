@@ -46,6 +46,12 @@ export function evalNode(node: ASTNode, env: Env): LispValue {
 
     const [first, ...rest] = node.elements
 
+    if (first?.type === 'symbol' && first.name === 'let') {
+      const [bindings, ...body] = rest
+      if (!bindings) throw new Error("'let' requires a bindings list")
+      return evalLet(bindings, body, env)
+    }
+
     // Special form: (defmacro name (params...) body...)
     if (first?.type === 'symbol' && first.name === 'defmacro') {
       const [nameNode, paramsNode, ...body] = rest
@@ -190,6 +196,34 @@ export function evalNodes(ast: ASTNode[], env: Env): LispValue {
   }
 
   return result
+}
+
+function evalLet(bindingsNode: ASTNode, body: ASTNode[], env: Env): LispValue {
+  if (bindingsNode.type !== 'list') {
+    throw new Error("'let' bindings must be a list")
+  }
+
+  // 1. Create a child environment inheriting from outer env
+  const localEnv = new Env(env)
+
+  // 2. Evaluate all binding values in the OUTER env first
+  for (const binding of bindingsNode.elements) {
+    if (binding.type !== 'list' || binding.elements.length !== 2) {
+      throw new Error('Each binding must be a pair like (var val)')
+    }
+
+    const [varNode, valNode] = binding.elements
+    if (varNode?.type !== 'symbol') {
+      throw new Error('Binding target must be a symbol')
+    }
+
+    // Evaluate value in outer env (ensures parallel binding)
+    const val = evalNode(valNode!, env)
+    localEnv.defineVar(varNode.name, val)
+  }
+
+  // 3. Evaluate the body forms inside the child env
+  return evalNodes(body, localEnv)
 }
 
 export function pretty(val: LispValue): string {
