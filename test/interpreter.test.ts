@@ -305,6 +305,220 @@ describe('evalNodes()', () => {
       )
     })
   })
+
+  describe('quote', () => {
+    it('returns a quoted symbol without evaluating it', () => {
+      const env = createGlobalEnv()
+      const ast = read('(quote foo)')
+
+      expect(evalNodes(ast, env)).toEqual({ type: 'symbol', name: 'foo' })
+    })
+
+    it('returns a quoted list without evaluating it', () => {
+      const env = createGlobalEnv()
+      const ast = read('(quote (+ 1 2))')
+
+      expect(evalNodes(ast, env)).toEqual({
+        type: 'list',
+        elements: [
+          { type: 'symbol', name: '+' },
+          { type: 'number', value: 1 },
+          { type: 'number', value: 2 },
+        ],
+      })
+    })
+
+    it('supports the shorthand quote syntax', () => {
+      const env = createGlobalEnv()
+      const ast = read("'(1 2 3)")
+
+      expect(evalNodes(ast, env)).toEqual({
+        type: 'list',
+        elements: [
+          { type: 'number', value: 1 },
+          { type: 'number', value: 2 },
+          { type: 'number', value: 3 },
+        ],
+      })
+    })
+
+    it('throws when called with no arguments', () => {
+      const env = createGlobalEnv()
+      const ast = read('(quote)')
+
+      expect(() => evalNodes(ast, env)).toThrowError(
+        "'quote' requires exactly 1 argument"
+      )
+    })
+  })
+
+  describe('quasiquote', () => {
+    it('behaves like quote when there are no unquotes', () => {
+      const env = createGlobalEnv()
+      const ast = read('`(a b c)')
+
+      expect(evalNodes(ast, env)).toEqual({
+        type: 'list',
+        elements: [
+          { type: 'symbol', name: 'a' },
+          { type: 'symbol', name: 'b' },
+          { type: 'symbol', name: 'c' },
+        ],
+      })
+    })
+
+    it('throws when called with no arguments', () => {
+      const env = createGlobalEnv()
+      const ast = read('(quasiquote)')
+
+      expect(() => evalNodes(ast, env)).toThrowError(
+        "'quasiquote' requires exactly 1 argument"
+      )
+    })
+  })
+
+  describe('unquote', () => {
+    it('evaluates unquoted expressions inside a quasiquote (shorthand)', () => {
+      const env = createGlobalEnv()
+      const ast = read(`
+        (define x 5)
+        \`(a ,x c)
+      `)
+
+      expect(evalNodes(ast, env)).toEqual({
+        type: 'list',
+        elements: [
+          { type: 'symbol', name: 'a' },
+          { type: 'number', value: 5 },
+          { type: 'symbol', name: 'c' },
+        ],
+      })
+    })
+
+    it('evaluates the full form the same as the shorthand', () => {
+      const env = createGlobalEnv()
+      const ast = read(`
+        (define x 5)
+        (quasiquote (a (unquote x) c))
+      `)
+
+      expect(evalNodes(ast, env)).toEqual({
+        type: 'list',
+        elements: [
+          { type: 'symbol', name: 'a' },
+          { type: 'number', value: 5 },
+          { type: 'symbol', name: 'c' },
+        ],
+      })
+    })
+
+    it('only unquotes at the matching quasiquote nesting depth', () => {
+      const env = createGlobalEnv()
+      const ast = read(`
+        (define x 5)
+        \`(a \`(b ,(c ,x)))
+      `)
+
+      expect(evalNodes(ast, env)).toEqual({
+        type: 'list',
+        elements: [
+          { type: 'symbol', name: 'a' },
+          {
+            type: 'list',
+            elements: [
+              { type: 'symbol', name: 'quasiquote' },
+              {
+                type: 'list',
+                elements: [
+                  { type: 'symbol', name: 'b' },
+                  {
+                    type: 'list',
+                    elements: [
+                      { type: 'symbol', name: 'unquote' },
+                      {
+                        type: 'list',
+                        elements: [
+                          { type: 'symbol', name: 'c' },
+                          { type: 'number', value: 5 },
+                        ],
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      })
+    })
+
+    it('throws when used outside a quasiquote', () => {
+      const env = createGlobalEnv()
+      const ast = read('(unquote 5)')
+
+      expect(() => evalNodes(ast, env)).toThrowError(
+        "'unquote' is only valid inside a 'quasiquote'"
+      )
+    })
+  })
+
+  describe('unquote-splicing', () => {
+    it('splices a list into the surrounding quasiquoted list (shorthand)', () => {
+      const env = createGlobalEnv()
+      const ast = read(`
+        (define xs (list 1 2 3))
+        \`(a ,@xs b)
+      `)
+
+      expect(evalNodes(ast, env)).toEqual({
+        type: 'list',
+        elements: [
+          { type: 'symbol', name: 'a' },
+          { type: 'number', value: 1 },
+          { type: 'number', value: 2 },
+          { type: 'number', value: 3 },
+          { type: 'symbol', name: 'b' },
+        ],
+      })
+    })
+
+    it('evaluates the full form the same as the shorthand', () => {
+      const env = createGlobalEnv()
+      const ast = read(`
+        (define xs (list 1 2 3))
+        (quasiquote (a (unquote-splicing xs) b))
+      `)
+
+      expect(evalNodes(ast, env)).toEqual({
+        type: 'list',
+        elements: [
+          { type: 'symbol', name: 'a' },
+          { type: 'number', value: 1 },
+          { type: 'number', value: 2 },
+          { type: 'number', value: 3 },
+          { type: 'symbol', name: 'b' },
+        ],
+      })
+    })
+
+    it('throws when the spliced value is not a list', () => {
+      const env = createGlobalEnv()
+      const ast = read('`(a ,@5 b)')
+
+      expect(() => evalNodes(ast, env)).toThrowError(
+        "'unquote-splicing' requires a list"
+      )
+    })
+
+    it('throws when used outside a quasiquote', () => {
+      const env = createGlobalEnv()
+      const ast = read('(unquote-splicing (list 1 2))')
+
+      expect(() => evalNodes(ast, env)).toThrowError(
+        "'unquote-splicing' is only valid inside a 'quasiquote'"
+      )
+    })
+  })
 })
 
 describe('evalFile()', () => {
