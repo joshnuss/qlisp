@@ -37,7 +37,7 @@ describe('read()', () => {
 })
 
 describe('evalNode', () => {
-  it('returns text that starts with a quote as a symbol', () => {
+  it('returns a quoted symbol as a symbol literal, bypassing env lookup', () => {
     const env = createGlobalEnv()
     env.defineVar('x', { type: 'number', value: 42 })
 
@@ -45,8 +45,15 @@ describe('evalNode', () => {
     const varResult = evalNode({ type: 'symbol', name: 'x' }, env)
     expect(varResult).toEqual({ type: 'number', value: 42 })
 
-    // 2. Quoted symbol -> Symbol literal (bypasses env lookup)
-    const symbolResult = evalNode({ type: 'symbol', name: "'x" }, env)
+    // 2. (quote x) -> Symbol literal (bypasses env lookup)
+    const quoted: ASTNode = {
+      type: 'list',
+      elements: [
+        { type: 'symbol', name: 'quote' },
+        { type: 'symbol', name: 'x' },
+      ],
+    }
+    const symbolResult = evalNode(quoted, env)
     expect(symbolResult).toEqual({ type: 'symbol', name: 'x' })
   })
 })

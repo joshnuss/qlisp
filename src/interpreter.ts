@@ -1,6 +1,6 @@
 import { lexer } from './lexer.ts'
 import { parse } from './parser.ts'
-import { macroexpand } from './macro.ts'
+import { macroexpand, astToValue } from './macro.ts'
 import type { ASTNode } from './ast.ts'
 import { readFile } from 'node:fs/promises'
 import { Env } from './env.ts'
@@ -33,8 +33,6 @@ export function evalNode(node: ASTNode, env: Env): LispValue {
 
   // 2. Variable Lookup (Lisp-2: uses variable table)
   if (node.type === 'symbol') {
-    if (node.name.startsWith("'"))
-      return { type: 'symbol', name: node.name.substring(1) }
     return env.getVar(node.name)
   }
 
@@ -50,6 +48,26 @@ export function evalNode(node: ASTNode, env: Env): LispValue {
       const [bindings, ...body] = rest
       if (!bindings) throw new Error("'let' requires a bindings list")
       return evalLet(bindings, body, env)
+    }
+
+    if (first?.type === 'symbol' && first.name === 'quote') {
+      const [target] = rest
+      if (!target) throw new Error("'quote' requires exactly 1 argument")
+      return astToValue(target)
+    }
+
+    if (first?.type === 'symbol' && first.name === 'quasiquote') {
+      const [target] = rest
+      if (!target) throw new Error("'quasiquote' requires exactly 1 argument")
+      return evalQuasiquote(target, env, 1)
+    }
+
+    if (first?.type === 'symbol' && first.name === 'unquote') {
+      throw new Error("'unquote' is only valid inside a 'quasiquote'")
+    }
+
+    if (first?.type === 'symbol' && first.name === 'unquote-splicing') {
+      throw new Error("'unquote-splicing' is only valid inside a 'quasiquote'")
     }
 
     if (first?.type === 'symbol' && first.name === 'set') {
@@ -213,6 +231,84 @@ export function evalNodes(ast: ASTNode[], env: Env): LispValue {
   }
 
   return result
+}
+
+/**
+ * Walks a quasiquoted AST, evaluating `unquote` forms (and splicing
+ * `unquote-splicing` forms) while leaving everything else as literal data.
+ * Tracks nesting `depth` so nested quasiquotes only unquote at their own level.
+ */
+function evalQuasiquote(node: ASTNode, env: Env, depth: number): LispValue {
+  if (node.type !== 'list') {
+    return astToValue(node)
+  }
+
+  const [first, ...rest] = node.elements
+
+  if (
+    first?.type === 'symbol' &&
+    first.name === 'unquote' &&
+    node.elements.length === 2
+  ) {
+    if (depth === 1) {
+      return evalNode(rest[0]!, env)
+    }
+    return {
+      type: 'list',
+      elements: [
+        { type: 'symbol', name: 'unquote' },
+        evalQuasiquote(rest[0]!, env, depth - 1),
+      ],
+    }
+  }
+
+  if (
+    first?.type === 'symbol' &&
+    first.name === 'quasiquote' &&
+    node.elements.length === 2
+  ) {
+    return {
+      type: 'list',
+      elements: [
+        { type: 'symbol', name: 'quasiquote' },
+        evalQuasiquote(rest[0]!, env, depth + 1),
+      ],
+    }
+  }
+
+  const elements: LispValue[] = []
+
+  for (const el of node.elements) {
+    if (
+      el.type === 'list' &&
+      el.elements.length === 2 &&
+      el.elements[0]?.type === 'symbol' &&
+      el.elements[0].name === 'unquote-splicing'
+    ) {
+      const spliceTarget = el.elements[1]!
+
+      if (depth === 1) {
+        const spliced = evalNode(spliceTarget, env)
+        if (spliced.type !== 'list') {
+          throw new Error("'unquote-splicing' requires a list")
+        }
+        elements.push(...spliced.elements)
+      } else {
+        elements.push({
+          type: 'list',
+          elements: [
+            { type: 'symbol', name: 'unquote-splicing' },
+            evalQuasiquote(spliceTarget, env, depth - 1),
+          ],
+        })
+      }
+      continue
+    }
+
+    elements.push(evalQuasiquote(el, env, depth))
+  }
+
+  return { type: 'list', elements }
 }
 
 function evalLet(bindingsNode: ASTNode, body: ASTNode[], env: Env): LispValue {

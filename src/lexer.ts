@@ -105,6 +105,26 @@ export function lexer(input: string): Token[] {
       continue
     }
 
+    const isReaderPrefix = ch === "'" || ch === '`' || ch === ','
+
+    if (isReaderPrefix) {
+      const startLine = line
+      const startCol = col
+      let val = next()
+
+      if (val === ',' && peek() === '@') {
+        val += next()
+      }
+
+      tokens.push({
+        type: 'symbol',
+        value: val,
+        line: startLine,
+        col: startCol,
+      })
+      continue
+    }
+
     let raw = ''
     const startLine = line
     const startCol = col
@@ -114,7 +134,10 @@ export function lexer(input: string): Token[] {
       !/\s/.test(peek()) &&
       peek() !== '(' &&
       peek() !== ')' &&
-      peek() !== ';'
+      peek() !== ';' &&
+      peek() !== "'" &&
+      peek() !== '`' &&
+      peek() !== ','
     ) {
       raw += next()
     }

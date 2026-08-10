@@ -115,7 +115,13 @@ describe('macro.ts', () => {
           type: 'list',
           elements: [
             { type: 'symbol', name: 'list' },
-            { type: 'symbol', name: "'+" },
+            {
+              type: 'list',
+              elements: [
+                { type: 'symbol', name: 'quote' },
+                { type: 'symbol', name: '+' },
+              ],
+            },
             { type: 'symbol', name: 'x' },
             { type: 'number', value: 1 },
           ],
@@ -158,7 +164,13 @@ describe('macro.ts', () => {
             type: 'list',
             elements: [
               { type: 'symbol', name: 'list' },
-              { type: 'symbol', name: "'+" },
+              {
+                type: 'list',
+                elements: [
+                  { type: 'symbol', name: 'quote' },
+                  { type: 'symbol', name: '+' },
+                ],
+              },
               { type: 'symbol', name: 'x' },
               { type: 'number', value: 1 },
             ],
@@ -174,12 +186,24 @@ describe('macro.ts', () => {
             type: 'list',
             elements: [
               { type: 'symbol', name: 'list' },
-              { type: 'symbol', name: "'add1" },
+              {
+                type: 'list',
+                elements: [
+                  { type: 'symbol', name: 'quote' },
+                  { type: 'symbol', name: 'add1' },
+                ],
+              },
               {
                 type: 'list',
                 elements: [
                   { type: 'symbol', name: 'list' },
-                  { type: 'symbol', name: "'add1" },
+                  {
+                    type: 'list',
+                    elements: [
+                      { type: 'symbol', name: 'quote' },
+                      { type: 'symbol', name: 'add1' },
+                    ],
+                  },
                   { type: 'symbol', name: 'x' },
                 ],
               },
@@ -226,7 +250,13 @@ describe('macro.ts', () => {
             type: 'list',
             elements: [
               { type: 'symbol', name: 'list' },
-              { type: 'symbol', name: "'+" },
+              {
+                type: 'list',
+                elements: [
+                  { type: 'symbol', name: 'quote' },
+                  { type: 'symbol', name: '+' },
+                ],
+              },
               { type: 'symbol', name: 'x' },
               { type: 'number', value: 1 },
             ],
