@@ -395,6 +395,73 @@ describe('Env', () => {
     })
   })
 
+  describe('last', () => {
+    it('returns the last element of a list', () => {
+      const env = createGlobalEnv()
+      const lastFn = env.getFunc('last')
+
+      const list: LispValue = {
+        type: 'list',
+        elements: [
+          { type: 'number', value: 1 },
+          { type: 'number', value: 2 },
+          { type: 'number', value: 3 },
+        ],
+      }
+
+      if (lastFn.kind === 'builtin') {
+        expect(lastFn.fn([list])).toEqual({ type: 'number', value: 3 })
+      }
+    })
+
+    it('returns the only element of a single-element list', () => {
+      const env = createGlobalEnv()
+      const lastFn = env.getFunc('last')
+
+      const singleton: LispValue = {
+        type: 'list',
+        elements: [{ type: 'number', value: 42 }],
+      }
+
+      if (lastFn.kind === 'builtin') {
+        expect(lastFn.fn([singleton])).toEqual({ type: 'number', value: 42 })
+      }
+    })
+
+    it('throws on an empty list', () => {
+      const env = createGlobalEnv()
+      const lastFn = env.getFunc('last')
+
+      if (lastFn.kind === 'builtin') {
+        expect(() =>
+          lastFn.fn([{ type: 'list', elements: [] }])
+        ).toThrowError("'last' cannot operate on an empty list")
+      }
+    })
+
+    it('throws when the argument is not a list', () => {
+      const env = createGlobalEnv()
+      const lastFn = env.getFunc('last')
+
+      if (lastFn.kind === 'builtin') {
+        expect(() =>
+          lastFn.fn([{ type: 'string', value: 'x' }])
+        ).toThrowError("'last' expects a list argument")
+      }
+    })
+
+    it('throws when not given exactly 1 argument', () => {
+      const env = createGlobalEnv()
+      const lastFn = env.getFunc('last')
+
+      if (lastFn.kind === 'builtin') {
+        expect(() => lastFn.fn([])).toThrowError(
+          "'last' expects exactly 1 argument"
+        )
+      }
+    })
+  })
+
   describe('length', () => {
     it('returns the number of elements in a list', () => {
       const env = createGlobalEnv()
