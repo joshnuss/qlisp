@@ -164,6 +164,18 @@ export function evalNode(node: ASTNode, env: Env): LispValue {
       return evalCond(rest, env)
     }
 
+    // --- Special Form: (and expr...) ---
+    // Evaluates left to right, short-circuiting at the first falsy value.
+    if (first?.type === 'symbol' && first.name === 'and') {
+      return evalAnd(rest, env)
+    }
+
+    // --- Special Form: (or expr...) ---
+    // Evaluates left to right, short-circuiting at the first truthy value.
+    if (first?.type === 'symbol' && first.name === 'or') {
+      return evalOr(rest, env)
+    }
+
     // --- Special Form: (defun name (params...) body...) ---
     if (first?.type === 'symbol' && first.name === 'defun') {
       const [nameNode, paramsNode, ...bodyNodes] = rest
@@ -363,6 +375,40 @@ function evalCond(clauses: ASTNode[], env: Env): LispValue {
 
     if (isTruthy(testVal)) {
       return body.length === 0 ? testVal : evalNodes(body, env)
+    }
+  }
+
+  return { type: 'boolean', value: false }
+}
+
+/**
+ * Evaluates (and expr...) left to right, stopping and returning the first
+ * falsy value encountered. Returns the last value if all are truthy, or
+ * boolean true if given no expressions.
+ */
+function evalAnd(exprs: ASTNode[], env: Env): LispValue {
+  let result: LispValue = { type: 'boolean', value: true }
+
+  for (const expr of exprs) {
+    result = evalNode(expr, env)
+    if (!isTruthy(result)) {
+      return result
+    }
+  }
+
+  return result
+}
+
+/**
+ * Evaluates (or expr...) left to right, stopping and returning the first
+ * truthy value encountered. Returns boolean false (nil) if all are falsy,
+ * or if given no expressions.
+ */
+function evalOr(exprs: ASTNode[], env: Env): LispValue {
+  for (const expr of exprs) {
+    const result = evalNode(expr, env)
+    if (isTruthy(result)) {
+      return result
     }
   }
 

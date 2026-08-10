@@ -526,6 +526,74 @@ describe('evalNodes()', () => {
     })
   })
 
+  describe('and', () => {
+    it('returns the last value when all expressions are truthy', () => {
+      const env = createGlobalEnv()
+      const ast = read('(and 1 2 3)')
+
+      expect(evalNodes(ast, env)).toEqual({ type: 'number', value: 3 })
+    })
+
+    it('returns the first falsy value and stops evaluating', () => {
+      const env = createGlobalEnv()
+      const ast = read('(and 1 nil 3)')
+
+      expect(evalNodes(ast, env)).toEqual({ type: 'boolean', value: false })
+    })
+
+    it('returns boolean true when given no expressions', () => {
+      const env = createGlobalEnv()
+      const ast = read('(and)')
+
+      expect(evalNodes(ast, env)).toEqual({ type: 'boolean', value: true })
+    })
+
+    it('short-circuits: expressions after a falsy value are never evaluated', () => {
+      const env = createGlobalEnv()
+      const ast = read(`
+        (define calls 0)
+        (and nil (set calls (+ calls 1)))
+        calls
+      `)
+
+      expect(evalNodes(ast, env)).toEqual({ type: 'number', value: 0 })
+    })
+  })
+
+  describe('or', () => {
+    it('returns the first truthy value and stops evaluating', () => {
+      const env = createGlobalEnv()
+      const ast = read('(or nil 2 3)')
+
+      expect(evalNodes(ast, env)).toEqual({ type: 'number', value: 2 })
+    })
+
+    it('returns boolean false (nil) when all expressions are falsy', () => {
+      const env = createGlobalEnv()
+      const ast = read('(or nil (list))')
+
+      expect(evalNodes(ast, env)).toEqual({ type: 'boolean', value: false })
+    })
+
+    it('returns boolean false (nil) when given no expressions', () => {
+      const env = createGlobalEnv()
+      const ast = read('(or)')
+
+      expect(evalNodes(ast, env)).toEqual({ type: 'boolean', value: false })
+    })
+
+    it('short-circuits: expressions after a truthy value are never evaluated', () => {
+      const env = createGlobalEnv()
+      const ast = read(`
+        (define calls 0)
+        (or 1 (set calls (+ calls 1)))
+        calls
+      `)
+
+      expect(evalNodes(ast, env)).toEqual({ type: 'number', value: 0 })
+    })
+  })
+
   describe('set', () => {
     it('updates an existing variable in the global environment', () => {
       const env = createGlobalEnv()
