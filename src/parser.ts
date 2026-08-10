@@ -1,5 +1,5 @@
-import type { Token } from './lexer.js'
-import type { ASTNode } from './ast.js'
+import type { Token } from './lexer.ts'
+import type { ASTNode } from './ast.ts'
 
 function parseExpression(tokens: Token[]): ASTNode {
   const isStreamEmpty = tokens.length === 0
