@@ -94,5 +94,9 @@ export function valueToAST(val: LispValue): ASTNode {
         type: 'list',
         elements: val.elements.map(valueToAST),
       }
+    case 'function':
+      throw new Error(
+        'Cannot convert a function value back into AST: functions are not literal data'
+      )
   }
 }

@@ -25,6 +25,7 @@ export type LispValue =
   | { type: 'boolean'; value: boolean }
   | { type: 'symbol'; name: string }
   | { type: 'list'; elements: LispValue[] }
+  | { type: 'function'; params: string[]; body: ASTNode[]; env: Env }
 
 function reduceArgs(
   name: string,
@@ -136,14 +137,22 @@ export class Env {
     this.variables.set(name, value)
   }
 
-  getVar(name: string): LispValue {
+  tryGetVar(name: string): LispValue | null {
     if (this.variables.has(name)) {
       return this.variables.get(name)!
     }
     if (this.parent) {
-      return this.parent.getVar(name)
+      return this.parent.tryGetVar(name)
     }
-    throw new Error(`Unbound variable: '${name}'`)
+    return null
+  }
+
+  getVar(name: string): LispValue {
+    const value = this.tryGetVar(name)
+    if (value === null) {
+      throw new Error(`Unbound variable: '${name}'`)
+    }
+    return value
   }
 
   setVar(name: string, value: LispValue): void {
@@ -184,14 +193,22 @@ export class Env {
     })
   }
 
-  getFunc(name: string): FunctionBinding {
+  tryGetFunc(name: string): FunctionBinding | null {
     if (this.functions.has(name)) {
       return this.functions.get(name)!
     }
     if (this.parent) {
-      return this.parent.getFunc(name)
+      return this.parent.tryGetFunc(name)
     }
-    throw new Error(`Undefined function: '${name}'`)
+    return null
+  }
+
+  getFunc(name: string): FunctionBinding {
+    const binding = this.tryGetFunc(name)
+    if (binding === null) {
+      throw new Error(`Undefined function: '${name}'`)
+    }
+    return binding
   }
 }
 

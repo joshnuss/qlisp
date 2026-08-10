@@ -339,6 +339,109 @@ describe('evalNodes()', () => {
     })
   })
 
+  describe('lambda', () => {
+    it('creates a function value that can be called inline', () => {
+      const env = createGlobalEnv()
+      const ast = read('((lambda (x) (+ x 1)) 5)')
+
+      expect(evalNodes(ast, env)).toEqual({ type: 'number', value: 6 })
+    })
+
+    it('can be stored in a variable and called by name', () => {
+      const env = createGlobalEnv()
+      const ast = read(`
+        (define add1 (lambda (x) (+ x 1)))
+        (add1 41)
+      `)
+
+      expect(evalNodes(ast, env)).toEqual({ type: 'number', value: 42 })
+    })
+
+    it('closes over variables from its defining scope', () => {
+      const env = createGlobalEnv()
+      const ast = read(`
+        (define x 10)
+        (define add-x (lambda (y) (+ x y)))
+        (add-x 5)
+      `)
+
+      expect(evalNodes(ast, env)).toEqual({ type: 'number', value: 15 })
+    })
+
+    it('supports recursion when assigned via define', () => {
+      const env = createGlobalEnv()
+      const ast = read(`
+        (define fact (lambda (n) (if (<= n 1) 1 (* n (fact (- n 1))))))
+        (fact 5)
+      `)
+
+      expect(evalNodes(ast, env)).toEqual({ type: 'number', value: 120 })
+    })
+
+    it('can be passed as an argument to a defun-defined function', () => {
+      const env = createGlobalEnv()
+      const ast = read(`
+        (defun apply-twice (f x) (f (f x)))
+        (apply-twice (lambda (n) (* n 2)) 3)
+      `)
+
+      expect(evalNodes(ast, env)).toEqual({ type: 'number', value: 12 })
+    })
+
+    it('throws when called with the wrong number of arguments', () => {
+      const env = createGlobalEnv()
+      const ast = read('((lambda (x y) (+ x y)) 1)')
+
+      expect(() => evalNodes(ast, env)).toThrowError(
+        "Function 'lambda' expects 2 arguments, got 1"
+      )
+    })
+
+    it('throws when calling a variable that does not hold a function', () => {
+      const env = createGlobalEnv()
+      const ast = read(`
+        (define n 5)
+        (n 1)
+      `)
+
+      expect(() => evalNodes(ast, env)).toThrowError("'n' is not a function")
+    })
+
+    it('still throws "Undefined function" for a truly undefined symbol', () => {
+      const env = createGlobalEnv()
+      const ast = read('(undefined-thing 1)')
+
+      expect(() => evalNodes(ast, env)).toThrowError(
+        "Undefined function: 'undefined-thing'"
+      )
+    })
+
+    it('throws when the parameter list is missing or invalid', () => {
+      const env = createGlobalEnv()
+      const ast = read('(lambda x x)')
+
+      expect(() => evalNodes(ast, env)).toThrowError(
+        "'lambda' requires a list of parameter symbols"
+      )
+    })
+
+    it('throws when a parameter is not a symbol', () => {
+      const env = createGlobalEnv()
+      const ast = read('(lambda (1) 1)')
+
+      expect(() => evalNodes(ast, env)).toThrowError(
+        'Parameters must be symbols'
+      )
+    })
+
+    it('is pretty-printed as #<lambda (params...)>', () => {
+      const env = createGlobalEnv()
+      const ast = read('(lambda (x y) x)')
+
+      expect(pretty(evalNodes(ast, env))).toBe('#<lambda (x y)>')
+    })
+  })
+
   describe('set', () => {
     it('updates an existing variable in the global environment', () => {
       const env = createGlobalEnv()
