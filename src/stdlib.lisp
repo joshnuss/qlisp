@@ -38,3 +38,8 @@
   (if lst
       (append (reverse (cdr lst)) (list (car lst)))
       (list)))
+
+(defun nth (n lst)
+  (if (= n 0)
+      (car lst)
+      (nth (1- n) (cdr lst))))
