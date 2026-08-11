@@ -33,3 +33,8 @@
   (if a
       (cons (car a) (append (cdr a) b))
       b))
+
+(defun reverse (lst)
+  (if lst
+      (append (reverse (cdr lst)) (list (car lst)))
+      (list)))
