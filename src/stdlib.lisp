@@ -8,6 +8,14 @@
 
 (defun not (x) (if x nil t))
 
+; t if x is false or the empty list, matching this language's truthiness
+; rules. Unlike empty?, this never throws: any value can be checked.
+(defun null? (x) (not x))
+
+; t if x is a list or string with zero length. Unlike null?, a non-empty
+; string is not null? but an empty string IS empty?.
+(defun empty? (x) (= (length x) 0))
+
 (defun last (lst)
   (if (cdr lst)
       (last (cdr lst))
