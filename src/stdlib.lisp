@@ -28,3 +28,8 @@
   (if lst
       (reduce f (cdr lst) (apply f (list init (car lst))))
       init))
+
+(defun append (a b)
+  (if a
+      (cons (car a) (append (cdr a) b))
+      b))
