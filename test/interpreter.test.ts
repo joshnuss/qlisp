@@ -715,7 +715,7 @@ describe('evalNodes()', () => {
     it('binds fixed parameters normally alongside the rest parameter', () => {
       const env = createGlobalEnv()
       const ast = read(`
-        (defun my-sum (a &rest rest) (+ a (apply + rest)))
+        (defun my-sum (a &rest rest) (+ a (apply '+ rest)))
         (my-sum 1 2 3 4)
       `)
 
@@ -761,9 +761,9 @@ describe('evalNodes()', () => {
   })
 
   describe('apply', () => {
-    it('applies a builtin resolved via the function namespace', () => {
+    it('applies a quoted builtin, resolved via the function namespace', () => {
       const env = createGlobalEnv()
-      const ast = read('(apply + (list 1 2 3))')
+      const ast = read("(apply '+ (list 1 2 3))")
 
       expect(evalNodes(ast, env)).toEqual({ type: 'number', value: 6 })
     })
@@ -775,17 +775,17 @@ describe('evalNodes()', () => {
       expect(evalNodes(ast, env)).toEqual({ type: 'number', value: 42 })
     })
 
-    it('applies a defun-defined function', () => {
+    it('applies a quoted defun-defined function', () => {
       const env = createGlobalEnv()
       const ast = read(`
         (defun add3 (a b c) (+ a b c))
-        (apply add3 (list 1 2 3))
+        (apply 'add3 (list 1 2 3))
       `)
 
       expect(evalNodes(ast, env)).toEqual({ type: 'number', value: 6 })
     })
 
-    it('applies a variable holding a lambda', () => {
+    it('applies a variable holding a lambda, unquoted', () => {
       const env = createGlobalEnv()
       const ast = read(`
         (define double (lambda (x) (* x 2)))
@@ -795,9 +795,23 @@ describe('evalNodes()', () => {
       expect(evalNodes(ast, env)).toEqual({ type: 'number', value: 42 })
     })
 
+    it('applies a quoted symbol, resolved via the function namespace', () => {
+      const env = createGlobalEnv()
+      const ast = read("(apply 'car (list (list 10 20 30)))")
+
+      expect(evalNodes(ast, env)).toEqual({ type: 'number', value: 10 })
+    })
+
+    it('throws Unbound variable when the function argument is a bare builtin/defun name', () => {
+      const env = createGlobalEnv()
+      const ast = read('(apply + (list 1 2 3))')
+
+      expect(() => evalNodes(ast, env)).toThrowError("Unbound variable: '+'")
+    })
+
     it('throws when the second argument does not evaluate to a list', () => {
       const env = createGlobalEnv()
-      const ast = read('(apply + 5)')
+      const ast = read("(apply '+ 5)")
 
       expect(() => evalNodes(ast, env)).toThrowError(
         "'apply' requires its second argument to be a list"
@@ -806,35 +820,154 @@ describe('evalNodes()', () => {
 
     it('throws when called with fewer than 2 arguments', () => {
       const env = createGlobalEnv()
-      const ast = read('(apply +)')
+      const ast = read("(apply '+)")
 
       expect(() => evalNodes(ast, env)).toThrowError(
         "'apply' requires a function and an argument list"
       )
     })
 
-    it('throws "Undefined function" for a truly undefined symbol', () => {
+    it('throws "Undefined function" for a quoted undefined symbol', () => {
       const env = createGlobalEnv()
-      const ast = read('(apply not-a-thing (list 1))')
+      const ast = read("(apply 'not-a-thing (list 1))")
 
       expect(() => evalNodes(ast, env)).toThrowError(
         "Undefined function: 'not-a-thing'"
       )
     })
 
-    it('throws when the resolved variable does not hold a function', () => {
+    it('throws when a quoted symbol resolves to a non-function variable', () => {
       const env = createGlobalEnv()
       const ast = read(`
         (define n 5)
-        (apply n (list 1))
+        (apply 'n (list 1))
       `)
 
       expect(() => evalNodes(ast, env)).toThrowError("'n' is not a function")
     })
 
+    it('throws generically when the evaluated callee is neither a symbol nor a function', () => {
+      const env = createGlobalEnv()
+      const ast = read('(apply 5 (list 1))')
+
+      expect(() => evalNodes(ast, env)).toThrowError(
+        'Attempted to call a value that is not a function'
+      )
+    })
+
     it('propagates an arity error from the applied function', () => {
       const env = createGlobalEnv()
       const ast = read('(apply (lambda (x y) x) (list 1))')
+
+      expect(() => evalNodes(ast, env)).toThrowError(
+        "Function 'lambda' expects 2 arguments, got 1"
+      )
+    })
+  })
+
+  describe('funcall', () => {
+    it('calls a quoted builtin, resolved via the function namespace', () => {
+      const env = createGlobalEnv()
+      const ast = read("(funcall '+ 1 2 3)")
+
+      expect(evalNodes(ast, env)).toEqual({ type: 'number', value: 6 })
+    })
+
+    it('calls an inline lambda', () => {
+      const env = createGlobalEnv()
+      const ast = read('(funcall (lambda (x y) (* x y)) 6 7)')
+
+      expect(evalNodes(ast, env)).toEqual({ type: 'number', value: 42 })
+    })
+
+    it('calls a quoted defun-defined function', () => {
+      const env = createGlobalEnv()
+      const ast = read(`
+        (defun add3 (a b c) (+ a b c))
+        (funcall 'add3 1 2 3)
+      `)
+
+      expect(evalNodes(ast, env)).toEqual({ type: 'number', value: 6 })
+    })
+
+    it('calls a variable holding a lambda, unquoted', () => {
+      const env = createGlobalEnv()
+      const ast = read(`
+        (define double (lambda (x) (* x 2)))
+        (funcall double 21)
+      `)
+
+      expect(evalNodes(ast, env)).toEqual({ type: 'number', value: 42 })
+    })
+
+    it('calls a quoted symbol, resolved via the function namespace', () => {
+      const env = createGlobalEnv()
+      const ast = read("(funcall 'list 'a 'b 'c)")
+
+      expect(evalNodes(ast, env)).toEqual({
+        type: 'list',
+        elements: [
+          { type: 'symbol', name: 'a' },
+          { type: 'symbol', name: 'b' },
+          { type: 'symbol', name: 'c' },
+        ],
+      })
+    })
+
+    it('throws Unbound variable when the function argument is a bare builtin/defun name', () => {
+      const env = createGlobalEnv()
+      const ast = read('(funcall + 1 2 3)')
+
+      expect(() => evalNodes(ast, env)).toThrowError("Unbound variable: '+'")
+    })
+
+    it('passes no arguments when called with only a function', () => {
+      const env = createGlobalEnv()
+      const ast = read('(funcall (lambda () 42))')
+
+      expect(evalNodes(ast, env)).toEqual({ type: 'number', value: 42 })
+    })
+
+    it('throws when called with no arguments', () => {
+      const env = createGlobalEnv()
+      const ast = read('(funcall)')
+
+      expect(() => evalNodes(ast, env)).toThrowError(
+        "'funcall' requires a function"
+      )
+    })
+
+    it('throws "Undefined function" for a quoted undefined symbol', () => {
+      const env = createGlobalEnv()
+      const ast = read("(funcall 'not-a-thing 1)")
+
+      expect(() => evalNodes(ast, env)).toThrowError(
+        "Undefined function: 'not-a-thing'"
+      )
+    })
+
+    it('throws when a quoted symbol resolves to a non-function variable', () => {
+      const env = createGlobalEnv()
+      const ast = read(`
+        (define n 5)
+        (funcall 'n 1)
+      `)
+
+      expect(() => evalNodes(ast, env)).toThrowError("'n' is not a function")
+    })
+
+    it('throws generically when the evaluated callee is neither a symbol nor a function', () => {
+      const env = createGlobalEnv()
+      const ast = read('(funcall 5 1)')
+
+      expect(() => evalNodes(ast, env)).toThrowError(
+        'Attempted to call a value that is not a function'
+      )
+    })
+
+    it('propagates an arity error from the called function', () => {
+      const env = createGlobalEnv()
+      const ast = read('(funcall (lambda (x y) x) 1)')
 
       expect(() => evalNodes(ast, env)).toThrowError(
         "Function 'lambda' expects 2 arguments, got 1"

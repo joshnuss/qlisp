@@ -102,9 +102,10 @@ export function evalNode(node: ASTNode, env: Env): LispValue {
     }
 
     // --- Special Form: (apply fn args-list) ---
-    // `fn` is resolved the same way a call's operator position is (Lisp-2
-    // function namespace, then a variable holding a function value, then a
-    // general expression), so it works for builtins, defun, and lambdas.
+    // `fn` is evaluated like any other argument (unlike a call's operator
+    // position): a bare builtin/defun name like + is looked up as a
+    // variable and throws Unbound variable, since it's not one. Quote it,
+    // or pass a variable holding a function (e.g. from lambda), instead.
     if (first?.type === 'symbol' && first.name === 'apply') {
       const [calleeNode, argsListNode] = rest
       if (!calleeNode || !argsListNode) {
@@ -116,7 +117,24 @@ export function evalNode(node: ASTNode, env: Env): LispValue {
         throw new Error("'apply' requires its second argument to be a list")
       }
 
-      return resolveAndCall(calleeNode, argsListVal.elements, env)
+      return resolveEvaluatedCalleeAndCall(
+        calleeNode,
+        argsListVal.elements,
+        env
+      )
+    }
+
+    // --- Special Form: (funcall fn arg...) ---
+    // Like apply, but the arguments are passed directly instead of as a
+    // list. `fn` gets the same evaluated-argument resolution as apply.
+    if (first?.type === 'symbol' && first.name === 'funcall') {
+      const [calleeNode, ...argNodes] = rest
+      if (!calleeNode) {
+        throw new Error("'funcall' requires a function")
+      }
+
+      const args = argNodes.map((argNode) => evalNode(argNode, env))
+      return resolveEvaluatedCalleeAndCall(calleeNode, args, env)
     }
 
     if (first?.type === 'symbol' && first.name === 'quote') {
@@ -665,11 +683,13 @@ function callFunction(
 }
 
 /**
- * Resolves an operator position (a call's `first`, or `apply`'s function
- * argument) to a callable and invokes it with `args`. A bare symbol is
- * resolved Lisp-2 style: the function namespace first (builtins, defun),
- * then a variable holding a function value (e.g. from lambda). Anything
- * else is evaluated and must produce a function value.
+ * Resolves a call's operator position (`first`) to a callable and invokes
+ * it with `args`. A bare symbol is resolved Lisp-2 style: the function
+ * namespace first (builtins, defun), then a variable holding a function
+ * value (e.g. from lambda) — this is what lets (f a b) work as a call at
+ * all, without needing to quote `f`. Anything else is evaluated and
+ * handled the same way apply/funcall handle their function argument (see
+ * resolveEvaluatedCalleeAndCall / callResolvedValue).
  */
 function resolveAndCall(
   calleeNode: ASTNode,
@@ -677,32 +697,74 @@ function resolveAndCall(
   env: Env
 ): LispValue {
   if (calleeNode.type === 'symbol') {
-    const funcBinding = env.tryGetFunc(calleeNode.name)
-    if (funcBinding) {
-      if (funcBinding.kind === 'builtin') {
-        return funcBinding.fn(args)
-      }
-      return callFunction(funcBinding.fn, args, funcBinding.name)
-    }
+    return resolveNameAndCall(calleeNode.name, args, env)
+  }
+  return callResolvedValue(evalNode(calleeNode, env), args, env)
+}
 
-    const varVal = env.tryGetVar(calleeNode.name)
-    if (varVal) {
-      if (varVal.type !== 'function') {
-        throw new Error(`'${calleeNode.name}' is not a function`)
-      }
-      return callFunction(varVal, args, calleeNode.name)
-    }
+/**
+ * Resolves apply's/funcall's function argument to a callable and invokes
+ * it. Unlike a call's operator position, this argument is evaluated
+ * normally, like any other argument — so a bare builtin/defun name like +
+ * is looked up as a variable and throws Unbound variable, since it isn't
+ * one. Quote it (a symbol value is a function designator, resolved Lisp-2
+ * style) or pass a variable holding a function instead: (funcall '+ 1 2)
+ * and (funcall some-lambda-var 1 2) both work, (funcall + 1 2) does not.
+ */
+function resolveEvaluatedCalleeAndCall(
+  calleeNode: ASTNode,
+  args: LispValue[],
+  env: Env
+): LispValue {
+  return callResolvedValue(evalNode(calleeNode, env), args, env)
+}
 
-    throw new Error(`Undefined function: '${calleeNode.name}'`)
+/**
+ * Given an already-evaluated callee value, calls it: a function value is
+ * invoked directly, a symbol value is resolved as a function designator
+ * (Lisp-2 style, via resolveNameAndCall), anything else throws.
+ */
+function callResolvedValue(
+  calleeVal: LispValue,
+  args: LispValue[],
+  env: Env
+): LispValue {
+  if (calleeVal.type === 'symbol') {
+    return resolveNameAndCall(calleeVal.name, args, env)
   }
 
-  // Non-symbol operator position (e.g. an inline lambda): evaluate it
-  // and expect the result to be a callable function value.
-  const calleeVal = evalNode(calleeNode, env)
   if (calleeVal.type !== 'function') {
     throw new Error('Attempted to call a value that is not a function')
   }
   return callFunction(calleeVal, args, 'lambda')
+}
+
+/**
+ * Resolves a name to a callable, Lisp-2 style: the function namespace
+ * first (builtins, defun), then a variable holding a function value.
+ */
+function resolveNameAndCall(
+  name: string,
+  args: LispValue[],
+  env: Env
+): LispValue {
+  const funcBinding = env.tryGetFunc(name)
+  if (funcBinding) {
+    if (funcBinding.kind === 'builtin') {
+      return funcBinding.fn(args)
+    }
+    return callFunction(funcBinding.fn, args, funcBinding.name)
+  }
+
+  const varVal = env.tryGetVar(name)
+  if (varVal) {
+    if (varVal.type !== 'function') {
+      throw new Error(`'${name}' is not a function`)
+    }
+    return callFunction(varVal, args, name)
+  }
+
+  throw new Error(`Undefined function: '${name}'`)
 }
 
 export function pretty(val: LispValue): string {
