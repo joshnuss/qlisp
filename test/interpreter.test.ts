@@ -670,6 +670,88 @@ describe('evalNodes()', () => {
     })
   })
 
+  describe('apply', () => {
+    it('applies a builtin resolved via the function namespace', () => {
+      const env = createGlobalEnv()
+      const ast = read('(apply + (list 1 2 3))')
+
+      expect(evalNodes(ast, env)).toEqual({ type: 'number', value: 6 })
+    })
+
+    it('applies an inline lambda', () => {
+      const env = createGlobalEnv()
+      const ast = read('(apply (lambda (x y) (* x y)) (list 6 7))')
+
+      expect(evalNodes(ast, env)).toEqual({ type: 'number', value: 42 })
+    })
+
+    it('applies a defun-defined function', () => {
+      const env = createGlobalEnv()
+      const ast = read(`
+        (defun add3 (a b c) (+ a b c))
+        (apply add3 (list 1 2 3))
+      `)
+
+      expect(evalNodes(ast, env)).toEqual({ type: 'number', value: 6 })
+    })
+
+    it('applies a variable holding a lambda', () => {
+      const env = createGlobalEnv()
+      const ast = read(`
+        (define double (lambda (x) (* x 2)))
+        (apply double (list 21))
+      `)
+
+      expect(evalNodes(ast, env)).toEqual({ type: 'number', value: 42 })
+    })
+
+    it('throws when the second argument does not evaluate to a list', () => {
+      const env = createGlobalEnv()
+      const ast = read('(apply + 5)')
+
+      expect(() => evalNodes(ast, env)).toThrowError(
+        "'apply' requires its second argument to be a list"
+      )
+    })
+
+    it('throws when called with fewer than 2 arguments', () => {
+      const env = createGlobalEnv()
+      const ast = read('(apply +)')
+
+      expect(() => evalNodes(ast, env)).toThrowError(
+        "'apply' requires a function and an argument list"
+      )
+    })
+
+    it('throws "Undefined function" for a truly undefined symbol', () => {
+      const env = createGlobalEnv()
+      const ast = read('(apply not-a-thing (list 1))')
+
+      expect(() => evalNodes(ast, env)).toThrowError(
+        "Undefined function: 'not-a-thing'"
+      )
+    })
+
+    it('throws when the resolved variable does not hold a function', () => {
+      const env = createGlobalEnv()
+      const ast = read(`
+        (define n 5)
+        (apply n (list 1))
+      `)
+
+      expect(() => evalNodes(ast, env)).toThrowError("'n' is not a function")
+    })
+
+    it('propagates an arity error from the applied function', () => {
+      const env = createGlobalEnv()
+      const ast = read('(apply (lambda (x y) x) (list 1))')
+
+      expect(() => evalNodes(ast, env)).toThrowError(
+        "Function 'lambda' expects 2 arguments, got 1"
+      )
+    })
+  })
+
   describe('cond', () => {
     it('evaluates the body of the first truthy clause', () => {
       const env = createGlobalEnv()

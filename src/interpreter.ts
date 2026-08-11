@@ -103,6 +103,24 @@ export function evalNode(node: ASTNode, env: Env): LispValue {
       return { type: 'function', params, body, env }
     }
 
+    // --- Special Form: (apply fn args-list) ---
+    // `fn` is resolved the same way a call's operator position is (Lisp-2
+    // function namespace, then a variable holding a function value, then a
+    // general expression), so it works for builtins, defun, and lambdas.
+    if (first?.type === 'symbol' && first.name === 'apply') {
+      const [calleeNode, argsListNode] = rest
+      if (!calleeNode || !argsListNode) {
+        throw new Error("'apply' requires a function and an argument list")
+      }
+
+      const argsListVal = evalNode(argsListNode, env)
+      if (argsListVal.type !== 'list') {
+        throw new Error("'apply' requires its second argument to be a list")
+      }
+
+      return resolveAndCall(calleeNode, argsListVal.elements, env)
+    }
+
     if (first?.type === 'symbol' && first.name === 'quote') {
       const [target] = rest
       if (!target) throw new Error("'quote' requires exactly 1 argument")
@@ -264,35 +282,7 @@ export function evalNode(node: ASTNode, env: Env): LispValue {
     // Evaluate all argument expressions
     const args = rest.map((argNode) => evalNode(argNode, env))
 
-    if (first?.type === 'symbol') {
-      // Lisp-2: the function namespace is checked first (builtins, defun).
-      const funcBinding = env.tryGetFunc(first.name)
-      if (funcBinding) {
-        if (funcBinding.kind === 'builtin') {
-          return funcBinding.fn(args)
-        }
-        return callFunction(funcBinding.fn, args, funcBinding.name)
-      }
-
-      // Fall back to a variable holding a function value (e.g. from lambda).
-      const varVal = env.tryGetVar(first.name)
-      if (varVal) {
-        if (varVal.type !== 'function') {
-          throw new Error(`'${first.name}' is not a function`)
-        }
-        return callFunction(varVal, args, first.name)
-      }
-
-      throw new Error(`Undefined function: '${first.name}'`)
-    }
-
-    // Non-symbol operator position (e.g. an inline lambda): evaluate it
-    // and expect the result to be a callable function value.
-    const calleeVal = evalNode(first, env)
-    if (calleeVal.type !== 'function') {
-      throw new Error('Attempted to call a value that is not a function')
-    }
-    return callFunction(calleeVal, args, 'lambda')
+    return resolveAndCall(first, args, env)
   }
 
   throw new Error('Unknown AST node type')
@@ -617,6 +607,47 @@ function callFunction(
     result = evalNode(bodyNode, localEnv)
   }
   return result
+}
+
+/**
+ * Resolves an operator position (a call's `first`, or `apply`'s function
+ * argument) to a callable and invokes it with `args`. A bare symbol is
+ * resolved Lisp-2 style: the function namespace first (builtins, defun),
+ * then a variable holding a function value (e.g. from lambda). Anything
+ * else is evaluated and must produce a function value.
+ */
+function resolveAndCall(
+  calleeNode: ASTNode,
+  args: LispValue[],
+  env: Env
+): LispValue {
+  if (calleeNode.type === 'symbol') {
+    const funcBinding = env.tryGetFunc(calleeNode.name)
+    if (funcBinding) {
+      if (funcBinding.kind === 'builtin') {
+        return funcBinding.fn(args)
+      }
+      return callFunction(funcBinding.fn, args, funcBinding.name)
+    }
+
+    const varVal = env.tryGetVar(calleeNode.name)
+    if (varVal) {
+      if (varVal.type !== 'function') {
+        throw new Error(`'${calleeNode.name}' is not a function`)
+      }
+      return callFunction(varVal, args, calleeNode.name)
+    }
+
+    throw new Error(`Undefined function: '${calleeNode.name}'`)
+  }
+
+  // Non-symbol operator position (e.g. an inline lambda): evaluate it
+  // and expect the result to be a callable function value.
+  const calleeVal = evalNode(calleeNode, env)
+  if (calleeVal.type !== 'function') {
+    throw new Error('Attempted to call a value that is not a function')
+  }
+  return callFunction(calleeVal, args, 'lambda')
 }
 
 export function pretty(val: LispValue): string {
