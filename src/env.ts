@@ -8,6 +8,8 @@ const STDLIB_PATH = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
   'stdlib.lisp'
 )
+// Load qlisp-source definitions on top of the native builtins above.
+const stdlibSource = readFileSync(STDLIB_PATH, 'utf-8')
 
 export type MacroBinding = {
   params: string[]
@@ -345,8 +347,6 @@ export function createGlobalEnv(): Env {
     compareArgs('>=', (a, b) => a >= b)
   )
 
-  // Load qlisp-source definitions on top of the native builtins above.
-  const stdlibSource = readFileSync(STDLIB_PATH, 'utf-8')
   evalNodes(read(stdlibSource), env)
 
   return env
