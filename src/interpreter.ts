@@ -3,7 +3,7 @@ import { parse } from './parser.ts'
 import { macroexpand, astToValue } from './macro.ts'
 import type { ASTNode } from './ast.ts'
 import { readFile } from 'node:fs/promises'
-import { Env } from './env.ts'
+import { Env, type BuiltinFn, type UserDefinedFn } from './env.ts'
 
 export type LispValue =
   | { type: 'number'; value: number }
@@ -482,6 +482,21 @@ function evalLetBindings(
   formName: string,
   sequential: boolean
 ): LispValue {
+  const localEnv = buildLetEnv(bindingsNode, env, formName, sequential)
+  return evalNodes(body, localEnv)
+}
+
+/**
+ * Builds the child environment for `let`/`let*`, without evaluating the
+ * body. Split out from evalLetBindings so evalTail can propagate tail
+ * position into the body itself instead of evaluating it eagerly.
+ */
+function buildLetEnv(
+  bindingsNode: ASTNode,
+  env: Env,
+  formName: string,
+  sequential: boolean
+): Env {
   if (bindingsNode.type !== 'list') {
     throw new Error(`'${formName}' bindings must be a list`)
   }
@@ -504,8 +519,7 @@ function evalLetBindings(
     localEnv.defineVar(varNode.name, val)
   }
 
-  // 3. Evaluate the body forms inside the child env
-  return evalNodes(body, localEnv)
+  return localEnv
 }
 
 /**
@@ -639,16 +653,51 @@ function parseParamList(
  * scope extending the closure's lexical environment, then evaluates the
  * body sequentially and returns the last value.
  */
+
+/**
+ * Invokes a user-defined function or lambda closure. Runs as a trampoline:
+ * when the function's last body form is itself a call in tail position
+ * (directly, or through if/cond/when/unless/and/or/progn/let/let*), the
+ * loop below swaps in the called function and its args and continues,
+ * instead of recursing into another callFunction — so self- and
+ * mutually-tail-recursive qlisp code runs in constant JS stack space. See
+ * evalTail for how tail positions are identified.
+ */
 function callFunction(
-  fn: {
-    params: string[]
-    restParam: string | null
-    body: ASTNode[]
-    env: Env
-  },
+  fn: UserDefinedFn,
   args: LispValue[],
   label: string
 ): LispValue {
+  for (;;) {
+    checkArity(fn, args, label)
+
+    const localEnv = new Env(fn.env)
+    bindParams(fn, args, localEnv)
+
+    if (fn.body.length === 0) {
+      return { type: 'boolean', value: false }
+    }
+
+    for (let i = 0; i < fn.body.length - 1; i++) {
+      evalNode(fn.body[i]!, localEnv)
+    }
+
+    const tailResult = evalTail(fn.body[fn.body.length - 1]!, localEnv)
+    if (!tailResult.tail) {
+      return tailResult.value
+    }
+
+    fn = tailResult.fn
+    args = tailResult.args
+    label = tailResult.label
+  }
+}
+
+function checkArity(
+  fn: { params: string[]; restParam: string | null },
+  args: LispValue[],
+  label: string
+): void {
   if (fn.restParam === null) {
     if (args.length !== fn.params.length) {
       throw new Error(
@@ -660,8 +709,13 @@ function callFunction(
       `Function '${label}' expects at least ${fn.params.length} arguments, got ${args.length}`
     )
   }
+}
 
-  const localEnv = new Env(fn.env)
+function bindParams(
+  fn: { params: string[]; restParam: string | null },
+  args: LispValue[],
+  localEnv: Env
+): void {
   fn.params.forEach((param, index) => {
     localEnv.defineVar(param, args[index]!)
   })
@@ -672,12 +726,164 @@ function callFunction(
       elements: args.slice(fn.params.length),
     })
   }
+}
 
-  let result: LispValue = { type: 'boolean', value: false }
-  for (const bodyNode of fn.body) {
-    result = evalNode(bodyNode, localEnv)
+type TailResult =
+  | { tail: false; value: LispValue }
+  | { tail: true; fn: UserDefinedFn; args: LispValue[]; label: string }
+
+/**
+ * Evaluates `node` as if it sits in tail position of a function body.
+ * For the control-flow forms whose own value is just whatever their last
+ * sub-expression evaluates to (if/cond/when/unless/and/or/progn/let/
+ * let*), this recurses into that sub-expression instead of evaluating it
+ * outright — that recursion is bounded by the form's static nesting in
+ * the source, not by runtime recursion depth, so it's stack-safe. Once
+ * it reaches a call to a user-defined function or lambda, it returns a
+ * `{tail: true, ...}` signal instead of invoking it, letting
+ * callFunction's loop take over. Anything else (builtins, literals,
+ * other special forms, or a callee position that isn't a bare symbol —
+ * apply/funcall are not tail-optimized) is evaluated immediately via the
+ * normal evalNode path and wrapped as `{tail: false, ...}`.
+ *
+ * This mirrors the branch-selection logic already in the corresponding
+ * SPECIAL_FORMS entries for those forms — keep the two in sync.
+ */
+function evalTail(node: ASTNode, env: Env): TailResult {
+  if (node.type !== 'list' || node.elements.length === 0) {
+    return { tail: false, value: evalNode(node, env) }
   }
-  return result
+
+  const [first, ...rest] = node.elements
+
+  if (first?.type === 'symbol') {
+    switch (first.name) {
+      case 'if': {
+        const [condNode, thenNode, elseNode] = rest
+        if (!condNode || !thenNode) {
+          return { tail: false, value: evalNode(node, env) }
+        }
+        if (isTruthy(evalNode(condNode, env))) {
+          return evalTail(thenNode, env)
+        }
+        return elseNode
+          ? evalTail(elseNode, env)
+          : { tail: false, value: { type: 'boolean', value: false } }
+      }
+
+      case 'cond': {
+        for (const clause of rest) {
+          if (clause.type !== 'list' || clause.elements.length === 0) {
+            return { tail: false, value: evalNode(node, env) }
+          }
+          const [testNode, ...body] = clause.elements
+          const testVal = evalNode(testNode!, env)
+          if (isTruthy(testVal)) {
+            return body.length === 0
+              ? { tail: false, value: testVal }
+              : evalBodyTail(body, env)
+          }
+        }
+        return { tail: false, value: { type: 'boolean', value: false } }
+      }
+
+      case 'when': {
+        const [testNode, ...body] = rest
+        if (!testNode) return { tail: false, value: evalNode(node, env) }
+        return isTruthy(evalNode(testNode, env))
+          ? evalBodyTail(body, env)
+          : { tail: false, value: { type: 'boolean', value: false } }
+      }
+
+      case 'unless': {
+        const [testNode, ...body] = rest
+        if (!testNode) return { tail: false, value: evalNode(node, env) }
+        return isTruthy(evalNode(testNode, env))
+          ? { tail: false, value: { type: 'boolean', value: false } }
+          : evalBodyTail(body, env)
+      }
+
+      case 'and': {
+        if (rest.length === 0) {
+          return { tail: false, value: { type: 'boolean', value: true } }
+        }
+        for (let i = 0; i < rest.length - 1; i++) {
+          const val = evalNode(rest[i]!, env)
+          if (!isTruthy(val)) return { tail: false, value: val }
+        }
+        return evalTail(rest[rest.length - 1]!, env)
+      }
+
+      case 'or': {
+        if (rest.length === 0) {
+          return { tail: false, value: { type: 'boolean', value: false } }
+        }
+        for (let i = 0; i < rest.length - 1; i++) {
+          const val = evalNode(rest[i]!, env)
+          if (isTruthy(val)) return { tail: false, value: val }
+        }
+        return evalTail(rest[rest.length - 1]!, env)
+      }
+
+      case 'progn':
+        return evalBodyTail(rest, env)
+
+      case 'let': {
+        const [bindings, ...body] = rest
+        if (!bindings) return { tail: false, value: evalNode(node, env) }
+        return evalBodyTail(body, buildLetEnv(bindings, env, 'let', false))
+      }
+
+      case 'let*': {
+        const [bindings, ...body] = rest
+        if (!bindings) return { tail: false, value: evalNode(node, env) }
+        return evalBodyTail(body, buildLetEnv(bindings, env, 'let*', true))
+      }
+    }
+
+    // Any other special form (lambda, quote, defun, apply, funcall,
+    // dolist, ...) doesn't propagate tail position; evaluate normally.
+    if (SPECIAL_FORMS[first.name]) {
+      return { tail: false, value: evalNode(node, env) }
+    }
+  }
+
+  const args = rest.map((argNode) => evalNode(argNode, env))
+  return resolveTail(first, args, env)
+}
+
+/** Evaluates all but the last of `body` normally, then the last via evalTail. */
+function evalBodyTail(body: ASTNode[], env: Env): TailResult {
+  if (body.length === 0) {
+    return { tail: false, value: { type: 'boolean', value: false } }
+  }
+  for (let i = 0; i < body.length - 1; i++) {
+    evalNode(body[i]!, env)
+  }
+  return evalTail(body[body.length - 1]!, env)
+}
+
+/**
+ * Like resolveAndCall, but for tail position: a bare-symbol callee (the
+ * common case — direct self/mutual recursion) resolves to a `{tail:
+ * true, ...}` signal instead of calling immediately. Anything else (a
+ * non-symbol operator position, e.g. an inline lambda call) falls back
+ * to the regular, non-tail-optimized resolveAndCall — still correct,
+ * just not stack-constant for that less common shape.
+ */
+function resolveTail(
+  calleeNode: ASTNode,
+  args: LispValue[],
+  env: Env
+): TailResult {
+  if (calleeNode.type === 'symbol') {
+    const resolved = resolveName(calleeNode.name, env)
+    return resolved.kind === 'builtin'
+      ? { tail: false, value: resolved.fn(args) }
+      : { tail: true, fn: resolved.fn, args, label: resolved.label }
+  }
+
+  return { tail: false, value: resolveAndCall(calleeNode, args, env) }
 }
 
 /**
@@ -737,21 +943,24 @@ function callResolvedValue(
   return callFunction(calleeVal, args, 'lambda')
 }
 
+/** What a name resolves to, Lisp-2 style — see resolveName. */
+type Resolved =
+  | { kind: 'builtin'; fn: BuiltinFn }
+  | { kind: 'user'; fn: UserDefinedFn; label: string }
+
 /**
  * Resolves a name to a callable, Lisp-2 style: the function namespace
  * first (builtins, defun), then a variable holding a function value.
+ * Resolution only — doesn't call anything, so both the eager path
+ * (resolveNameAndCall) and the tail-position path (resolveTail) can
+ * share it.
  */
-function resolveNameAndCall(
-  name: string,
-  args: LispValue[],
-  env: Env
-): LispValue {
+function resolveName(name: string, env: Env): Resolved {
   const funcBinding = env.tryGetFunc(name)
   if (funcBinding) {
-    if (funcBinding.kind === 'builtin') {
-      return funcBinding.fn(args)
-    }
-    return callFunction(funcBinding.fn, args, funcBinding.name)
+    return funcBinding.kind === 'builtin'
+      ? { kind: 'builtin', fn: funcBinding.fn }
+      : { kind: 'user', fn: funcBinding.fn, label: funcBinding.name }
   }
 
   const varVal = env.tryGetVar(name)
@@ -759,10 +968,21 @@ function resolveNameAndCall(
     if (varVal.type !== 'function') {
       throw new Error(`'${name}' is not a function`)
     }
-    return callFunction(varVal, args, name)
+    return { kind: 'user', fn: varVal, label: name }
   }
 
   throw new Error(`Undefined function: '${name}'`)
+}
+
+function resolveNameAndCall(
+  name: string,
+  args: LispValue[],
+  env: Env
+): LispValue {
+  const resolved = resolveName(name, env)
+  return resolved.kind === 'builtin'
+    ? resolved.fn(args)
+    : callFunction(resolved.fn, args, resolved.label)
 }
 
 export function pretty(val: LispValue): string {
