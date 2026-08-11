@@ -51,241 +51,11 @@ export function evalNode(node: ASTNode, env: Env): LispValue {
 
     const [first, ...rest] = node.elements
 
-    if (first?.type === 'symbol' && first.name === 'let') {
-      const [bindings, ...body] = rest
-      if (!bindings) throw new Error("'let' requires a bindings list")
-      return evalLet(bindings, body, env)
-    }
-
-    // --- Special Form: (let* ((var val) ...) body...) ---
-    // Like let, but each binding can see the ones bound before it.
-    if (first?.type === 'symbol' && first.name === 'let*') {
-      const [bindings, ...body] = rest
-      if (!bindings) throw new Error("'let*' requires a bindings list")
-      return evalLetStar(bindings, body, env)
-    }
-
-    // --- Special Form: (progn body...) ---
-    // Evaluates each form in sequence, in the current scope, returning the last value.
-    if (first?.type === 'symbol' && first.name === 'progn') {
-      return evalNodes(rest, env)
-    }
-
-    // --- Special Form: (dolist (var list-expression) body...) ---
-    if (first?.type === 'symbol' && first.name === 'dolist') {
-      const [bindingNode, ...body] = rest
-      if (!bindingNode) throw new Error("'dolist' requires a binding form")
-      return evalDolist(bindingNode, body, env)
-    }
-
-    // --- Special Form: (dotimes (var count-expression) body...) ---
-    if (first?.type === 'symbol' && first.name === 'dotimes') {
-      const [bindingNode, ...body] = rest
-      if (!bindingNode) throw new Error("'dotimes' requires a binding form")
-      return evalDotimes(bindingNode, body, env)
-    }
-
-    // --- Special Form: (while test body...) ---
-    if (first?.type === 'symbol' && first.name === 'while') {
-      const [testNode, ...body] = rest
-      if (!testNode) throw new Error("'while' requires a test expression")
-      return evalWhile(testNode, body, env)
-    }
-
-    // --- Special Form: (lambda (params... [&rest rest]) body...) ---
-    // Returns a first-class function value closing over the current scope.
-    if (first?.type === 'symbol' && first.name === 'lambda') {
-      const [paramsNode, ...body] = rest
-      const { params, restParam } = parseParamList(paramsNode, 'lambda')
-
-      return { type: 'function', params, restParam, body, env }
-    }
-
-    // --- Special Form: (apply fn args-list) ---
-    // `fn` is evaluated like any other argument (unlike a call's operator
-    // position): a bare builtin/defun name like + is looked up as a
-    // variable and throws Unbound variable, since it's not one. Quote it,
-    // or pass a variable holding a function (e.g. from lambda), instead.
-    if (first?.type === 'symbol' && first.name === 'apply') {
-      const [calleeNode, argsListNode] = rest
-      if (!calleeNode || !argsListNode) {
-        throw new Error("'apply' requires a function and an argument list")
+    if (first?.type === 'symbol') {
+      const specialForm = SPECIAL_FORMS[first.name]
+      if (specialForm) {
+        return specialForm(rest, env)
       }
-
-      const argsListVal = evalNode(argsListNode, env)
-      if (argsListVal.type !== 'list') {
-        throw new Error("'apply' requires its second argument to be a list")
-      }
-
-      return resolveEvaluatedCalleeAndCall(
-        calleeNode,
-        argsListVal.elements,
-        env
-      )
-    }
-
-    // --- Special Form: (funcall fn arg...) ---
-    // Like apply, but the arguments are passed directly instead of as a
-    // list. `fn` gets the same evaluated-argument resolution as apply.
-    if (first?.type === 'symbol' && first.name === 'funcall') {
-      const [calleeNode, ...argNodes] = rest
-      if (!calleeNode) {
-        throw new Error("'funcall' requires a function")
-      }
-
-      const args = argNodes.map((argNode) => evalNode(argNode, env))
-      return resolveEvaluatedCalleeAndCall(calleeNode, args, env)
-    }
-
-    if (first?.type === 'symbol' && first.name === 'quote') {
-      const [target] = rest
-      if (!target) throw new Error("'quote' requires exactly 1 argument")
-      return astToValue(target)
-    }
-
-    if (first?.type === 'symbol' && first.name === 'quasiquote') {
-      const [target] = rest
-      if (!target) throw new Error("'quasiquote' requires exactly 1 argument")
-      return evalQuasiquote(target, env, 1)
-    }
-
-    if (first?.type === 'symbol' && first.name === 'unquote') {
-      throw new Error("'unquote' is only valid inside a 'quasiquote'")
-    }
-
-    if (first?.type === 'symbol' && first.name === 'unquote-splicing') {
-      throw new Error("'unquote-splicing' is only valid inside a 'quasiquote'")
-    }
-
-    if (first?.type === 'symbol' && first.name === 'set') {
-      const [varNode, exprNode] = rest
-      if (varNode?.type !== 'symbol' || !exprNode) {
-        throw new Error(
-          "Syntax error: 'set' requires a symbol and an expression"
-        )
-      }
-
-      // Evaluate the expression in the current environment
-      const newValue = evalNode(exprNode, env)
-
-      // Mutate the variable binding in the environment chain
-      env.setVar(varNode.name, newValue)
-
-      return newValue
-    }
-
-    // Special form: (defmacro name (params...) body...)
-    if (first?.type === 'symbol' && first.name === 'defmacro') {
-      const [nameNode, paramsNode, ...body] = rest
-      if (nameNode?.type !== 'symbol' || paramsNode?.type !== 'list') {
-        throw new Error('Invalid defmacro syntax')
-      }
-
-      const params = paramsNode.elements.map((p) => {
-        if (p.type !== 'symbol')
-          throw new Error('Macro parameters must be symbols')
-        return p.name
-      })
-
-      env.defmacro(nameNode.name, params, body)
-      return { type: 'symbol', name: nameNode.name }
-    }
-
-    // --- Special Form: (if condition then-branch else-branch?) ---
-    if (first?.type === 'symbol' && first.name === 'if') {
-      const [condNode, thenNode, elseNode] = rest
-
-      if (!condNode || !thenNode) {
-        throw new Error(
-          "'if' requires at least a condition and a 'then' branch"
-        )
-      }
-
-      // 1. Evaluate ONLY the condition
-      const condVal = evalNode(condNode, env)
-
-      // 2. Evaluate ONLY the branch dictated by the condition
-      if (isTruthy(condVal)) {
-        return evalNode(thenNode, env)
-      } else if (elseNode) {
-        return evalNode(elseNode, env)
-      } else {
-        // Unhandled false branch evaluates to boolean false (or nil)
-        return { type: 'boolean', value: false }
-      }
-    }
-
-    // --- Special Form: (cond (test body...) (test body...) ...) ---
-    if (first?.type === 'symbol' && first.name === 'cond') {
-      return evalCond(rest, env)
-    }
-
-    // --- Special Form: (and expr...) ---
-    // Evaluates left to right, short-circuiting at the first falsy value.
-    if (first?.type === 'symbol' && first.name === 'and') {
-      return evalAnd(rest, env)
-    }
-
-    // --- Special Form: (or expr...) ---
-    // Evaluates left to right, short-circuiting at the first truthy value.
-    if (first?.type === 'symbol' && first.name === 'or') {
-      return evalOr(rest, env)
-    }
-
-    // --- Special Form: (when test body...) ---
-    // Evaluates body (implicit progn) only if test is truthy.
-    if (first?.type === 'symbol' && first.name === 'when') {
-      const [testNode, ...body] = rest
-      if (!testNode) throw new Error("'when' requires a test expression")
-
-      return isTruthy(evalNode(testNode, env))
-        ? evalNodes(body, env)
-        : { type: 'boolean', value: false }
-    }
-
-    // --- Special Form: (unless test body...) ---
-    // Evaluates body (implicit progn) only if test is falsy.
-    if (first?.type === 'symbol' && first.name === 'unless') {
-      const [testNode, ...body] = rest
-      if (!testNode) throw new Error("'unless' requires a test expression")
-
-      return isTruthy(evalNode(testNode, env))
-        ? { type: 'boolean', value: false }
-        : evalNodes(body, env)
-    }
-
-    // --- Special Form: (defun name (params... [&rest rest]) body...) ---
-    if (first?.type === 'symbol' && first.name === 'defun') {
-      const [nameNode, paramsNode, ...bodyNodes] = rest
-
-      if (nameNode?.type !== 'symbol') {
-        throw new Error('defun requires a valid function name symbol')
-      }
-
-      const { params, restParam } = parseParamList(paramsNode, 'defun')
-
-      env.defun(nameNode.name, params, bodyNodes, restParam)
-      return { type: 'symbol', name: nameNode.name }
-    }
-
-    // --- Special Form: (setq var value) or (define var value) ---
-    if (
-      first?.type === 'symbol' &&
-      (first.name === 'setq' || first.name === 'define')
-    ) {
-      const [varNode, valNode] = rest
-
-      if (varNode?.type !== 'symbol') {
-        throw new Error('Variable name must be a symbol')
-      }
-
-      if (!valNode) {
-        throw new Error(`Missing value for ${varNode.name}`)
-      }
-
-      const val = evalNode(valNode, env)
-      env.defineVar(varNode.name, val)
-      return val
     }
 
     // --- Function Call ---
@@ -296,6 +66,234 @@ export function evalNode(node: ASTNode, env: Env): LispValue {
   }
 
   throw new Error('Unknown AST node type')
+}
+
+type SpecialFormHandler = (rest: ASTNode[], env: Env) => LispValue
+
+// Dispatch table for special forms, keyed by the symbol in operator
+// position. Each entry gets the form's remaining elements (`rest`,
+// unevaluated) and the current env. Anything not found here falls
+// through to a normal function call in evalNode above.
+const SPECIAL_FORMS: Record<string, SpecialFormHandler> = {
+  let: (rest, env) => {
+    const [bindings, ...body] = rest
+    if (!bindings) throw new Error("'let' requires a bindings list")
+    return evalLet(bindings, body, env)
+  },
+
+  // Like let, but each binding can see the ones bound before it.
+  'let*': (rest, env) => {
+    const [bindings, ...body] = rest
+    if (!bindings) throw new Error("'let*' requires a bindings list")
+    return evalLetStar(bindings, body, env)
+  },
+
+  // (progn body...): evaluates each form in sequence, in the current
+  // scope, returning the last value.
+  progn: evalNodes,
+
+  // (dolist (var list-expression) body...)
+  dolist: (rest, env) => {
+    const [bindingNode, ...body] = rest
+    if (!bindingNode) throw new Error("'dolist' requires a binding form")
+    return evalDolist(bindingNode, body, env)
+  },
+
+  // (dotimes (var count-expression) body...)
+  dotimes: (rest, env) => {
+    const [bindingNode, ...body] = rest
+    if (!bindingNode) throw new Error("'dotimes' requires a binding form")
+    return evalDotimes(bindingNode, body, env)
+  },
+
+  // (while test body...)
+  while: (rest, env) => {
+    const [testNode, ...body] = rest
+    if (!testNode) throw new Error("'while' requires a test expression")
+    return evalWhile(testNode, body, env)
+  },
+
+  // (lambda (params... [&rest rest]) body...): returns a first-class
+  // function value closing over the current scope.
+  lambda: (rest, env) => {
+    const [paramsNode, ...body] = rest
+    const { params, restParam } = parseParamList(paramsNode, 'lambda')
+
+    return { type: 'function', params, restParam, body, env }
+  },
+
+  // (apply fn args-list): `fn` is evaluated like any other argument
+  // (unlike a call's operator position) — a bare builtin/defun name like
+  // + is looked up as a variable and throws Unbound variable, since it's
+  // not one. Quote it, or pass a variable holding a function (e.g. from
+  // lambda), instead.
+  apply: (rest, env) => {
+    const [calleeNode, argsListNode] = rest
+    if (!calleeNode || !argsListNode) {
+      throw new Error("'apply' requires a function and an argument list")
+    }
+
+    const argsListVal = evalNode(argsListNode, env)
+    if (argsListVal.type !== 'list') {
+      throw new Error("'apply' requires its second argument to be a list")
+    }
+
+    return resolveEvaluatedCalleeAndCall(calleeNode, argsListVal.elements, env)
+  },
+
+  // (funcall fn arg...): like apply, but the arguments are passed
+  // directly instead of as a list. `fn` gets the same evaluated-argument
+  // resolution as apply.
+  funcall: (rest, env) => {
+    const [calleeNode, ...argNodes] = rest
+    if (!calleeNode) {
+      throw new Error("'funcall' requires a function")
+    }
+
+    const args = argNodes.map((argNode) => evalNode(argNode, env))
+    return resolveEvaluatedCalleeAndCall(calleeNode, args, env)
+  },
+
+  quote: (rest) => {
+    const [target] = rest
+    if (!target) throw new Error("'quote' requires exactly 1 argument")
+    return astToValue(target)
+  },
+
+  quasiquote: (rest, env) => {
+    const [target] = rest
+    if (!target) throw new Error("'quasiquote' requires exactly 1 argument")
+    return evalQuasiquote(target, env, 1)
+  },
+
+  unquote: () => {
+    throw new Error("'unquote' is only valid inside a 'quasiquote'")
+  },
+
+  'unquote-splicing': () => {
+    throw new Error("'unquote-splicing' is only valid inside a 'quasiquote'")
+  },
+
+  set: (rest, env) => {
+    const [varNode, exprNode] = rest
+    if (varNode?.type !== 'symbol' || !exprNode) {
+      throw new Error("Syntax error: 'set' requires a symbol and an expression")
+    }
+
+    // Evaluate the expression in the current environment
+    const newValue = evalNode(exprNode, env)
+
+    // Mutate the variable binding in the environment chain
+    env.setVar(varNode.name, newValue)
+
+    return newValue
+  },
+
+  // (defmacro name (params...) body...)
+  defmacro: (rest, env) => {
+    const [nameNode, paramsNode, ...body] = rest
+    if (nameNode?.type !== 'symbol' || paramsNode?.type !== 'list') {
+      throw new Error('Invalid defmacro syntax')
+    }
+
+    const params = paramsNode.elements.map((p) => {
+      if (p.type !== 'symbol')
+        throw new Error('Macro parameters must be symbols')
+      return p.name
+    })
+
+    env.defmacro(nameNode.name, params, body)
+    return { type: 'symbol', name: nameNode.name }
+  },
+
+  // (if condition then-branch else-branch?)
+  if: (rest, env) => {
+    const [condNode, thenNode, elseNode] = rest
+
+    if (!condNode || !thenNode) {
+      throw new Error("'if' requires at least a condition and a 'then' branch")
+    }
+
+    // 1. Evaluate ONLY the condition
+    const condVal = evalNode(condNode, env)
+
+    // 2. Evaluate ONLY the branch dictated by the condition
+    if (isTruthy(condVal)) {
+      return evalNode(thenNode, env)
+    } else if (elseNode) {
+      return evalNode(elseNode, env)
+    } else {
+      // Unhandled false branch evaluates to boolean false (or nil)
+      return { type: 'boolean', value: false }
+    }
+  },
+
+  // (cond (test body...) (test body...) ...)
+  cond: evalCond,
+
+  // (and expr...): evaluates left to right, short-circuiting at the
+  // first falsy value.
+  and: evalAnd,
+
+  // (or expr...): evaluates left to right, short-circuiting at the
+  // first truthy value.
+  or: evalOr,
+
+  // (when test body...): evaluates body (implicit progn) only if test
+  // is truthy.
+  when: (rest, env) => {
+    const [testNode, ...body] = rest
+    if (!testNode) throw new Error("'when' requires a test expression")
+
+    return isTruthy(evalNode(testNode, env))
+      ? evalNodes(body, env)
+      : { type: 'boolean', value: false }
+  },
+
+  // (unless test body...): evaluates body (implicit progn) only if test
+  // is falsy.
+  unless: (rest, env) => {
+    const [testNode, ...body] = rest
+    if (!testNode) throw new Error("'unless' requires a test expression")
+
+    return isTruthy(evalNode(testNode, env))
+      ? { type: 'boolean', value: false }
+      : evalNodes(body, env)
+  },
+
+  // (defun name (params... [&rest rest]) body...)
+  defun: (rest, env) => {
+    const [nameNode, paramsNode, ...bodyNodes] = rest
+
+    if (nameNode?.type !== 'symbol') {
+      throw new Error('defun requires a valid function name symbol')
+    }
+
+    const { params, restParam } = parseParamList(paramsNode, 'defun')
+
+    env.defun(nameNode.name, params, bodyNodes, restParam)
+    return { type: 'symbol', name: nameNode.name }
+  },
+
+  // (setq var value) or (define var value)
+  setq: evalDefine,
+  define: evalDefine,
+}
+
+function evalDefine(rest: ASTNode[], env: Env): LispValue {
+  const [varNode, valNode] = rest
+
+  if (varNode?.type !== 'symbol') {
+    throw new Error('Variable name must be a symbol')
+  }
+
+  if (!valNode) {
+    throw new Error(`Missing value for ${varNode.name}`)
+  }
+
+  const val = evalNode(valNode, env)
+  env.defineVar(varNode.name, val)
+  return val
 }
 
 /**
