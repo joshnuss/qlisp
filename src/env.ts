@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { ASTNode } from './ast.ts'
-import { pretty, read, evalNodes } from './interpreter.ts'
+import { pretty, read, evalNodes, type LispValue } from './interpreter.ts'
 
 const STDLIB_PATH = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -29,20 +29,6 @@ export type UserDefinedFn = {
 export type FunctionBinding =
   | { kind: 'builtin'; name: string; fn: BuiltinFn }
   | { kind: 'user'; name: string; fn: UserDefinedFn }
-
-export type LispValue =
-  | { type: 'number'; value: number }
-  | { type: 'string'; value: string }
-  | { type: 'boolean'; value: boolean }
-  | { type: 'symbol'; name: string }
-  | { type: 'list'; elements: LispValue[] }
-  | {
-      type: 'function'
-      params: string[]
-      restParam: string | null
-      body: ASTNode[]
-      env: Env
-    }
 
 function reduceArgs(
   name: string,
