@@ -66,3 +66,5 @@
 (defun zero? (n) (= n 0))
 (defun positive? (n) (> n 0))
 (defun negative? (n) (< n 0))
+
+(defun identity (x) x)
