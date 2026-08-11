@@ -297,6 +297,70 @@ export function createGlobalEnv(): Env {
     return args[args.length - 1]!
   })
 
+  env.defineBuiltinFunc('format', (args: LispValue[]): LispValue => {
+    if (args.length === 0) {
+      throw new Error("'format' expects at least 1 argument")
+    }
+
+    const [controlArg, ...values] = args
+    if (controlArg!.type !== 'string') {
+      throw new Error("'format' requires a string as its first argument")
+    }
+
+    const control = controlArg!.value
+    let output = ''
+    let valueIndex = 0
+
+    for (let i = 0; i < control.length; i++) {
+      const ch = control[i]!
+
+      if (ch !== '~') {
+        output += ch
+        continue
+      }
+
+      if (i + 1 >= control.length) {
+        throw new Error(
+          "'format' has a trailing '~' with no directive after it"
+        )
+      }
+
+      const directive = control[i + 1]!
+      i++
+
+      if (directive === 'a' || directive === 'A') {
+        if (valueIndex >= values.length) {
+          throw new Error("'format' has more '~a' directives than arguments")
+        }
+        // Aesthetic: strings are inserted unquoted, unlike pretty()
+        const val = values[valueIndex]!
+        output += val.type === 'string' ? val.value : pretty(val)
+        valueIndex++
+        continue
+      }
+
+      if (directive === '%') {
+        output += '\n'
+        continue
+      }
+
+      if (directive === '~') {
+        output += '~'
+        continue
+      }
+
+      throw new Error(
+        `'format' encountered an unknown directive '~${directive}'`
+      )
+    }
+
+    if (valueIndex < values.length) {
+      throw new Error("'format' was given more arguments than '~a' directives")
+    }
+
+    return { type: 'string', value: output }
+  })
+
   env.defineBuiltinFunc('list', (args: LispValue[]): LispValue => {
     return {
       type: 'list',

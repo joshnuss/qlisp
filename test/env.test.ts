@@ -235,6 +235,178 @@ describe('Env', () => {
       }
     })
   })
+
+  describe('format', () => {
+    it('substitutes ~a with values in order, without printing anything', () => {
+      const env = createGlobalEnv()
+      const formatFn = env.getFunc('format')
+
+      const spy = vi.spyOn(console, 'log').mockImplementation(() => {})
+      const writeSpy = vi
+        .spyOn(process.stdout, 'write')
+        .mockImplementation(() => true)
+
+      if (formatFn.kind === 'builtin') {
+        const result = formatFn.fn([
+          { type: 'string', value: '~a is ~a years old' },
+          { type: 'string', value: 'Ada' },
+          { type: 'number', value: 30 },
+        ])
+
+        expect(result).toEqual({
+          type: 'string',
+          value: 'Ada is 30 years old',
+        })
+      }
+
+      expect(spy).not.toHaveBeenCalled()
+      expect(writeSpy).not.toHaveBeenCalled()
+
+      spy.mockRestore()
+      writeSpy.mockRestore()
+    })
+
+    it('inserts strings via ~a unquoted, unlike pretty()', () => {
+      const env = createGlobalEnv()
+      const formatFn = env.getFunc('format')
+
+      if (formatFn.kind === 'builtin') {
+        const result = formatFn.fn([
+          { type: 'string', value: '~a' },
+          { type: 'string', value: 'raw' },
+        ])
+
+        expect(result).toEqual({ type: 'string', value: 'raw' })
+      }
+    })
+
+    it('formats non-string values the same way pretty() does', () => {
+      const env = createGlobalEnv()
+      const formatFn = env.getFunc('format')
+
+      if (formatFn.kind === 'builtin') {
+        const result = formatFn.fn([
+          { type: 'string', value: '~a' },
+          {
+            type: 'list',
+            elements: [
+              { type: 'number', value: 1 },
+              { type: 'boolean', value: true },
+            ],
+          },
+        ])
+
+        expect(result).toEqual({ type: 'string', value: '(1 t)' })
+      }
+    })
+
+    it('expands ~% to a newline', () => {
+      const env = createGlobalEnv()
+      const formatFn = env.getFunc('format')
+
+      if (formatFn.kind === 'builtin') {
+        const result = formatFn.fn([{ type: 'string', value: 'line1~%line2' }])
+
+        expect(result).toEqual({ type: 'string', value: 'line1\nline2' })
+      }
+    })
+
+    it('expands ~~ to a literal tilde', () => {
+      const env = createGlobalEnv()
+      const formatFn = env.getFunc('format')
+
+      if (formatFn.kind === 'builtin') {
+        const result = formatFn.fn([{ type: 'string', value: 'a~~b' }])
+
+        expect(result).toEqual({ type: 'string', value: 'a~b' })
+      }
+    })
+
+    it('returns the control string unchanged when it has no directives', () => {
+      const env = createGlobalEnv()
+      const formatFn = env.getFunc('format')
+
+      if (formatFn.kind === 'builtin') {
+        const result = formatFn.fn([{ type: 'string', value: 'no directives' }])
+
+        expect(result).toEqual({ type: 'string', value: 'no directives' })
+      }
+    })
+
+    it('throws when called with zero arguments', () => {
+      const env = createGlobalEnv()
+      const formatFn = env.getFunc('format')
+
+      if (formatFn.kind === 'builtin') {
+        expect(() => formatFn.fn([])).toThrowError(
+          "'format' expects at least 1 argument"
+        )
+      }
+    })
+
+    it('throws when the first argument is not a string', () => {
+      const env = createGlobalEnv()
+      const formatFn = env.getFunc('format')
+
+      if (formatFn.kind === 'builtin') {
+        expect(() => formatFn.fn([{ type: 'number', value: 5 }])).toThrowError(
+          "'format' requires a string as its first argument"
+        )
+      }
+    })
+
+    it('throws when there are more ~a directives than arguments', () => {
+      const env = createGlobalEnv()
+      const formatFn = env.getFunc('format')
+
+      if (formatFn.kind === 'builtin') {
+        expect(() =>
+          formatFn.fn([
+            { type: 'string', value: '~a ~a' },
+            { type: 'number', value: 1 },
+          ])
+        ).toThrowError("'format' has more '~a' directives than arguments")
+      }
+    })
+
+    it('throws when there are more arguments than ~a directives', () => {
+      const env = createGlobalEnv()
+      const formatFn = env.getFunc('format')
+
+      if (formatFn.kind === 'builtin') {
+        expect(() =>
+          formatFn.fn([
+            { type: 'string', value: '~a' },
+            { type: 'number', value: 1 },
+            { type: 'number', value: 2 },
+          ])
+        ).toThrowError("'format' was given more arguments than '~a' directives")
+      }
+    })
+
+    it('throws on a trailing tilde with no directive after it', () => {
+      const env = createGlobalEnv()
+      const formatFn = env.getFunc('format')
+
+      if (formatFn.kind === 'builtin') {
+        expect(() =>
+          formatFn.fn([{ type: 'string', value: 'trailing~' }])
+        ).toThrowError("'format' has a trailing '~' with no directive after it")
+      }
+    })
+
+    it('throws on an unknown directive', () => {
+      const env = createGlobalEnv()
+      const formatFn = env.getFunc('format')
+
+      if (formatFn.kind === 'builtin') {
+        expect(() =>
+          formatFn.fn([{ type: 'string', value: '~q' }])
+        ).toThrowError("'format' encountered an unknown directive '~q'")
+      }
+    })
+  })
+
   describe('list', () => {
     it('creates an empty list when called with 0 arguments', () => {
       const env = createGlobalEnv()
