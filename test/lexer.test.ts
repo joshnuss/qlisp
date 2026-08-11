@@ -6,22 +6,24 @@ describe('lexer()', () => {
     const tokens = lexer('()')
 
     expect(tokens).toEqual([
-      { type: 'paren', value: '(', line: 1, col: 1 },
-      { type: 'paren', value: ')', line: 1, col: 2 },
+      { type: 'paren', value: '(', loc: { line: 1, col: 1 } },
+      { type: 'paren', value: ')', loc: { line: 1, col: 2 } },
     ])
   })
 
   it('should tokenize number literal', () => {
     const tokens = lexer('42')
 
-    expect(tokens).toEqual([{ type: 'number', value: '42', line: 1, col: 1 }])
+    expect(tokens).toEqual([
+      { type: 'number', value: '42', loc: { line: 1, col: 1 } },
+    ])
   })
 
   it('should tokenize string', () => {
     const tokens = lexer('"apple"')
 
     expect(tokens).toEqual([
-      { type: 'string', value: 'apple', line: 1, col: 1 },
+      { type: 'string', value: 'apple', loc: { line: 1, col: 1 } },
     ])
   })
 
@@ -47,8 +49,7 @@ describe('lexer()', () => {
     expect(stringToken).toEqual({
       type: 'string',
       value: 'hello world',
-      line: 1,
-      col: 13,
+      loc: { line: 1, col: 13 },
     })
   })
 
@@ -67,11 +68,11 @@ describe('lexer()', () => {
     const tokens = lexer(code)
 
     expect(tokens).toMatchObject([
-      { value: '(', line: 1, col: 1 },
-      { value: '+', line: 1, col: 2 },
-      { value: 'x', line: 2, col: 3 },
-      { value: '5', line: 2, col: 5 },
-      { value: ')', line: 2, col: 6 },
+      { value: '(', loc: { line: 1, col: 1 } },
+      { value: '+', loc: { line: 1, col: 2 } },
+      { value: 'x', loc: { line: 2, col: 3 } },
+      { value: '5', loc: { line: 2, col: 5 } },
+      { value: ')', loc: { line: 2, col: 6 } },
     ])
   })
 

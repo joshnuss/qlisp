@@ -1,8 +1,10 @@
 export interface Token {
   type: 'paren' | 'number' | 'string' | 'symbol'
   value: string
-  line: number
-  col: number
+  loc: {
+    line: number
+    col: number
+  }
 }
 
 export function lexer(input: string): Token[] {
@@ -52,8 +54,7 @@ export function lexer(input: string): Token[] {
       tokens.push({
         type: 'paren',
         value: val,
-        line: startLine,
-        col: startCol,
+        loc: { line: startLine, col: startCol },
       })
       continue
     }
@@ -99,8 +100,7 @@ export function lexer(input: string): Token[] {
       tokens.push({
         type: 'string',
         value: strVal,
-        line: startLine,
-        col: startCol,
+        loc: { line: startLine, col: startCol },
       })
       continue
     }
@@ -119,8 +119,7 @@ export function lexer(input: string): Token[] {
       tokens.push({
         type: 'symbol',
         value: val,
-        line: startLine,
-        col: startCol,
+        loc: { line: startLine, col: startCol },
       })
       continue
     }
@@ -147,8 +146,7 @@ export function lexer(input: string): Token[] {
     tokens.push({
       type: isNumber ? 'number' : 'symbol',
       value: raw,
-      line: startLine,
-      col: startCol,
+      loc: { line: startLine, col: startCol },
     })
   }
 

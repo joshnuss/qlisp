@@ -28,7 +28,7 @@ function parseExpression(tokens: Token[]): ASTNode {
     const isMissingClosingParen = tokens.length === 0
     if (isMissingClosingParen) {
       throw new Error(
-        `Unclosed parenthesis starting at line ${currentToken.line}, col ${currentToken.col}`
+        `Unclosed parenthesis starting at line ${currentToken.loc.line}, col ${currentToken.loc.col}`
       )
     }
 
@@ -38,7 +38,7 @@ function parseExpression(tokens: Token[]): ASTNode {
 
   if (isCloseParenthesis) {
     throw new Error(
-      `Unexpected ')' at line ${currentToken.line}, col ${currentToken.col}`
+      `Unexpected ')' at line ${currentToken.loc.line}, col ${currentToken.loc.col}`
     )
   }
 
