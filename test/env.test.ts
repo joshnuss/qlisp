@@ -493,73 +493,6 @@ describe('Env', () => {
     })
   })
 
-  describe('last', () => {
-    it('returns the last element of a list', () => {
-      const env = createGlobalEnv()
-      const lastFn = env.getFunc('last')
-
-      const list: LispValue = {
-        type: 'list',
-        elements: [
-          { type: 'number', value: 1 },
-          { type: 'number', value: 2 },
-          { type: 'number', value: 3 },
-        ],
-      }
-
-      if (lastFn.kind === 'builtin') {
-        expect(lastFn.fn([list])).toEqual({ type: 'number', value: 3 })
-      }
-    })
-
-    it('returns the only element of a single-element list', () => {
-      const env = createGlobalEnv()
-      const lastFn = env.getFunc('last')
-
-      const singleton: LispValue = {
-        type: 'list',
-        elements: [{ type: 'number', value: 42 }],
-      }
-
-      if (lastFn.kind === 'builtin') {
-        expect(lastFn.fn([singleton])).toEqual({ type: 'number', value: 42 })
-      }
-    })
-
-    it('throws on an empty list', () => {
-      const env = createGlobalEnv()
-      const lastFn = env.getFunc('last')
-
-      if (lastFn.kind === 'builtin') {
-        expect(() => lastFn.fn([{ type: 'list', elements: [] }])).toThrowError(
-          "'last' cannot operate on an empty list"
-        )
-      }
-    })
-
-    it('throws when the argument is not a list', () => {
-      const env = createGlobalEnv()
-      const lastFn = env.getFunc('last')
-
-      if (lastFn.kind === 'builtin') {
-        expect(() => lastFn.fn([{ type: 'string', value: 'x' }])).toThrowError(
-          "'last' expects a list argument"
-        )
-      }
-    })
-
-    it('throws when not given exactly 1 argument', () => {
-      const env = createGlobalEnv()
-      const lastFn = env.getFunc('last')
-
-      if (lastFn.kind === 'builtin') {
-        expect(() => lastFn.fn([])).toThrowError(
-          "'last' expects exactly 1 argument"
-        )
-      }
-    })
-  })
-
   describe('length', () => {
     it('returns the number of elements in a list', () => {
       const env = createGlobalEnv()
@@ -677,61 +610,6 @@ describe('Env', () => {
       expect(() => lt.fn([num(1)])).toThrowError(
         "'<' requires at least 2 arguments"
       )
-    })
-  })
-  describe('not', () => {
-    const env = createGlobalEnv()
-
-    it('inverts boolean true to false', () => {
-      const notFn = env.getFunc('not')
-      if (notFn.kind !== 'builtin') return
-
-      const trueVal: LispValue = { type: 'boolean', value: true }
-      expect(notFn.fn([trueVal])).toEqual({ type: 'boolean', value: false })
-    })
-
-    it('inverts boolean false to true', () => {
-      const notFn = env.getFunc('not')
-      if (notFn.kind !== 'builtin') return
-
-      const falseVal: LispValue = { type: 'boolean', value: false }
-      expect(notFn.fn([falseVal])).toEqual({ type: 'boolean', value: true })
-    })
-
-    it('treats empty list () as falsey and returns true', () => {
-      const notFn = env.getFunc('not')
-      if (notFn.kind !== 'builtin') return
-
-      const emptyList: LispValue = { type: 'list', elements: [] }
-      expect(notFn.fn([emptyList])).toEqual({ type: 'boolean', value: true })
-    })
-
-    it('treats numbers, strings, and populated lists as truthy and returns false', () => {
-      const notFn = env.getFunc('not')
-      if (notFn.kind !== 'builtin') return
-
-      const num: LispValue = { type: 'number', value: 0 }
-      const str: LispValue = { type: 'string', value: '' }
-      const nonList: LispValue = { type: 'list', elements: [num] }
-
-      expect(notFn.fn([num])).toEqual({ type: 'boolean', value: false })
-      expect(notFn.fn([str])).toEqual({ type: 'boolean', value: false })
-      expect(notFn.fn([nonList])).toEqual({ type: 'boolean', value: false })
-    })
-
-    it('throws when given 0 or more than 1 argument', () => {
-      const notFn = env.getFunc('not')
-      if (notFn.kind !== 'builtin') return
-
-      expect(() => notFn.fn([])).toThrowError(
-        "'not' expects exactly 1 argument"
-      )
-      expect(() =>
-        notFn.fn([
-          { type: 'boolean', value: true },
-          { type: 'boolean', value: false },
-        ])
-      ).toThrowError("'not' expects exactly 1 argument")
     })
   })
 

@@ -308,22 +308,6 @@ export function createGlobalEnv(): Env {
   env.defineBuiltinFunc('cdr', cdrFn('cdr'))
   env.defineBuiltinFunc('rest', cdrFn('rest'))
 
-  env.defineBuiltinFunc('last', (args: LispValue[]): LispValue => {
-    if (args.length !== 1) {
-      throw new Error("'last' expects exactly 1 argument")
-    }
-
-    const [list] = args
-    if (list!.type !== 'list') {
-      throw new Error("'last' expects a list argument")
-    }
-    if (list!.elements.length === 0) {
-      throw new Error("'last' cannot operate on an empty list")
-    }
-
-    return list!.elements[list!.elements.length - 1]!
-  })
-
   env.defineBuiltinFunc('length', (args: LispValue[]): LispValue => {
     if (args.length !== 1) {
       throw new Error("'length' expects exactly 1 argument")
@@ -360,21 +344,6 @@ export function createGlobalEnv(): Env {
     '>=',
     compareArgs('>=', (a, b) => a >= b)
   )
-
-  env.defineBuiltinFunc('not', (args: LispValue[]): LispValue => {
-    if (args.length !== 1) {
-      throw new Error("'not' expects exactly 1 argument")
-    }
-
-    const val = args[0]!
-
-    // Truthiness check: false and empty list () are falsey
-    const isFalsey =
-      (val.type === 'boolean' && val.value === false) ||
-      (val.type === 'list' && val.elements.length === 0)
-
-    return { type: 'boolean', value: isFalsey }
-  })
 
   // Load qlisp-source definitions on top of the native builtins above.
   const stdlibSource = readFileSync(STDLIB_PATH, 'utf-8')
