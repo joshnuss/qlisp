@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { Env, createGlobalEnv } from '../src/env.ts'
-import { type LispValue } from '../src/interpreter.js'
+import { type LispValue, read, evalNodes } from '../src/interpreter.js'
 
 function num(n: number): LispValue {
   return { type: 'number', value: n }
@@ -767,6 +767,39 @@ describe('Env', () => {
       const childEnv = new Env(parentEnv)
 
       expect(childEnv.getMacro('unknown-macro')).toBeNull()
+    })
+  })
+
+  describe('stdlib', () => {
+    it('loads qlisp-source definitions from stdlib.lisp into a fresh global env', () => {
+      const env = createGlobalEnv()
+
+      expect(env.getFunc('1+').kind).toBe('user')
+      expect(env.getFunc('1-').kind).toBe('user')
+    })
+
+    it('1+ increments a number', () => {
+      const env = createGlobalEnv()
+      const ast = read('(1+ 5)')
+
+      expect(evalNodes(ast, env)).toEqual({ type: 'number', value: 6 })
+    })
+
+    it('1- decrements a number', () => {
+      const env = createGlobalEnv()
+      const ast = read('(1- 5)')
+
+      expect(evalNodes(ast, env)).toEqual({ type: 'number', value: 4 })
+    })
+
+    it('gives each global env its own independent stdlib bindings', () => {
+      const env1 = createGlobalEnv()
+      const env2 = createGlobalEnv()
+
+      env1.defun('1+', ['n'], [{ type: 'number', value: 999 }])
+
+      const ast = read('(1+ 5)')
+      expect(evalNodes(ast, env2)).toEqual({ type: 'number', value: 6 })
     })
   })
 })

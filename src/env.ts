@@ -1,5 +1,13 @@
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import type { ASTNode } from './ast.ts'
-import { pretty } from './interpreter.ts'
+import { pretty, read, evalNodes } from './interpreter.ts'
+
+const STDLIB_PATH = path.join(
+  path.dirname(fileURLToPath(import.meta.url)),
+  'stdlib.lisp'
+)
 
 export type MacroBinding = {
   params: string[]
@@ -367,6 +375,10 @@ export function createGlobalEnv(): Env {
 
     return { type: 'boolean', value: isFalsey }
   })
+
+  // Load qlisp-source definitions on top of the native builtins above.
+  const stdlibSource = readFileSync(STDLIB_PATH, 'utf-8')
+  evalNodes(read(stdlibSource), env)
 
   return env
 }
