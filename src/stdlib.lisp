@@ -54,3 +54,15 @@
 
 (defun second (lst) (nth 1 lst))
 (defun third (lst) (nth 2 lst))
+
+(defun abs (n) (if (< n 0) (- n) n))
+
+(defun min (&rest ns)
+  (reduce (lambda (a b) (if (< a b) a b)) (cdr ns) (car ns)))
+
+(defun max (&rest ns)
+  (reduce (lambda (a b) (if (> a b) a b)) (cdr ns) (car ns)))
+
+(defun zero? (n) (= n 0))
+(defun positive? (n) (> n 0))
+(defun negative? (n) (< n 0))
