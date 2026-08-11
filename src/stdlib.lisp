@@ -51,3 +51,6 @@
   (if (= n 0)
       (car lst)
       (nth (1- n) (cdr lst))))
+
+(defun second (lst) (nth 1 lst))
+(defun third (lst) (nth 2 lst))
