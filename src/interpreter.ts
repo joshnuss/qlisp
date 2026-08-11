@@ -11,7 +11,13 @@ export type LispValue =
   | { type: 'boolean'; value: boolean }
   | { type: 'symbol'; name: string }
   | { type: 'list'; elements: LispValue[] }
-  | { type: 'function'; params: string[]; body: ASTNode[]; env: Env }
+  | {
+      type: 'function'
+      params: string[]
+      restParam: string | null
+      body: ASTNode[]
+      env: Env
+    }
 
 export function read(input: string): ASTNode[] {
   const tokens = lexer(input)
@@ -86,21 +92,13 @@ export function evalNode(node: ASTNode, env: Env): LispValue {
       return evalWhile(testNode, body, env)
     }
 
-    // --- Special Form: (lambda (params...) body...) ---
+    // --- Special Form: (lambda (params... [&rest rest]) body...) ---
     // Returns a first-class function value closing over the current scope.
     if (first?.type === 'symbol' && first.name === 'lambda') {
       const [paramsNode, ...body] = rest
+      const { params, restParam } = parseParamList(paramsNode, 'lambda')
 
-      if (paramsNode?.type !== 'list') {
-        throw new Error("'lambda' requires a list of parameter symbols")
-      }
-
-      const params = paramsNode.elements.map((p) => {
-        if (p.type !== 'symbol') throw new Error('Parameters must be symbols')
-        return p.name
-      })
-
-      return { type: 'function', params, body, env }
+      return { type: 'function', params, restParam, body, env }
     }
 
     // --- Special Form: (apply fn args-list) ---
@@ -238,23 +236,17 @@ export function evalNode(node: ASTNode, env: Env): LispValue {
         : evalNodes(body, env)
     }
 
-    // --- Special Form: (defun name (params...) body...) ---
+    // --- Special Form: (defun name (params... [&rest rest]) body...) ---
     if (first?.type === 'symbol' && first.name === 'defun') {
       const [nameNode, paramsNode, ...bodyNodes] = rest
 
       if (nameNode?.type !== 'symbol') {
         throw new Error('defun requires a valid function name symbol')
       }
-      if (paramsNode?.type !== 'list') {
-        throw new Error('defun requires a list of parameter symbols')
-      }
 
-      const params = paramsNode.elements.map((p) => {
-        if (p.type !== 'symbol') throw new Error('Parameters must be symbols')
-        return p.name
-      })
+      const { params, restParam } = parseParamList(paramsNode, 'defun')
 
-      env.defun(nameNode.name, params, bodyNodes)
+      env.defun(nameNode.name, params, bodyNodes, restParam)
       return { type: 'symbol', name: nameNode.name }
     }
 
@@ -582,18 +574,74 @@ function evalWhile(testNode: ASTNode, body: ASTNode[], env: Env): LispValue {
 }
 
 /**
+ * Parses a parameter list like (a b &rest c). Everything before `&rest`
+ * is a fixed parameter; `&rest` must be the second-to-last element,
+ * followed by exactly one symbol that collects any extra arguments into
+ * a list.
+ */
+function parseParamList(
+  paramsNode: ASTNode | undefined,
+  formName: string
+): { params: string[]; restParam: string | null } {
+  if (!paramsNode || paramsNode.type !== 'list') {
+    throw new Error(`'${formName}' requires a list of parameter symbols`)
+  }
+
+  const params: string[] = []
+  let restParam: string | null = null
+
+  for (let i = 0; i < paramsNode.elements.length; i++) {
+    const p = paramsNode.elements[i]!
+
+    if (p.type !== 'symbol') {
+      throw new Error('Parameters must be symbols')
+    }
+
+    if (p.name === '&rest') {
+      const restNode = paramsNode.elements[i + 1]
+      if (!restNode || restNode.type !== 'symbol') {
+        throw new Error(
+          "'&rest' must be followed by exactly one parameter symbol"
+        )
+      }
+      if (i + 2 !== paramsNode.elements.length) {
+        throw new Error("'&rest' parameter must be the last in the list")
+      }
+      restParam = restNode.name
+      break
+    }
+
+    params.push(p.name)
+  }
+
+  return { params, restParam }
+}
+
+/**
  * Invokes a user-defined function or lambda closure: binds `args` to
- * `params` in a new scope extending the closure's lexical environment,
- * then evaluates the body sequentially and returns the last value.
+ * `params` (plus any extra args to `restParam`, if present) in a new
+ * scope extending the closure's lexical environment, then evaluates the
+ * body sequentially and returns the last value.
  */
 function callFunction(
-  fn: { params: string[]; body: ASTNode[]; env: Env },
+  fn: {
+    params: string[]
+    restParam: string | null
+    body: ASTNode[]
+    env: Env
+  },
   args: LispValue[],
   label: string
 ): LispValue {
-  if (args.length !== fn.params.length) {
+  if (fn.restParam === null) {
+    if (args.length !== fn.params.length) {
+      throw new Error(
+        `Function '${label}' expects ${fn.params.length} arguments, got ${args.length}`
+      )
+    }
+  } else if (args.length < fn.params.length) {
     throw new Error(
-      `Function '${label}' expects ${fn.params.length} arguments, got ${args.length}`
+      `Function '${label}' expects at least ${fn.params.length} arguments, got ${args.length}`
     )
   }
 
@@ -601,6 +649,13 @@ function callFunction(
   fn.params.forEach((param, index) => {
     localEnv.defineVar(param, args[index]!)
   })
+
+  if (fn.restParam !== null) {
+    localEnv.defineVar(fn.restParam, {
+      type: 'list',
+      elements: args.slice(fn.params.length),
+    })
+  }
 
   let result: LispValue = { type: 'boolean', value: false }
   for (const bodyNode of fn.body) {
@@ -667,8 +722,12 @@ export function pretty(val: LispValue): string {
     case 'list':
       return `(${val.elements.map(pretty).join(' ')})`
 
-    case 'function':
-      return `#<lambda (${val.params.join(' ')})>`
+    case 'function': {
+      const paramList = val.restParam
+        ? [...val.params, '&rest', val.restParam]
+        : val.params
+      return `#<lambda (${paramList.join(' ')})>`
+    }
 
     default: {
       const _exhaustiveCheck: never = val

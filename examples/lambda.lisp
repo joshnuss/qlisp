@@ -17,3 +17,9 @@
 ; recursion via define
 (define fact (lambda (n) (if (<= n 1) 1 (* n (fact (- n 1))))))
 (print (fact 5))
+
+; &rest collects any extra arguments into a list
+(print ((lambda (&rest xs) xs) 1 2 3))
+
+; &rest can follow any number of fixed parameters
+(print ((lambda (a b &rest rest) (list a b rest)) 1 2 3 4 5))

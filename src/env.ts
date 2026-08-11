@@ -21,6 +21,7 @@ export type BuiltinFn = (args: LispValue[]) => LispValue
 
 export type UserDefinedFn = {
   params: string[]
+  restParam: string | null
   body: ASTNode[]
   env: Env
 }
@@ -35,7 +36,13 @@ export type LispValue =
   | { type: 'boolean'; value: boolean }
   | { type: 'symbol'; name: string }
   | { type: 'list'; elements: LispValue[] }
-  | { type: 'function'; params: string[]; body: ASTNode[]; env: Env }
+  | {
+      type: 'function'
+      params: string[]
+      restParam: string | null
+      body: ASTNode[]
+      env: Env
+    }
 
 function reduceArgs(
   name: string,
@@ -187,11 +194,16 @@ export class Env {
     return null
   }
 
-  defun(name: string, params: string[], body: ASTNode[]): void {
+  defun(
+    name: string,
+    params: string[],
+    body: ASTNode[],
+    restParam: string | null = null
+  ): void {
     this.functions.set(name, {
       kind: 'user',
       name,
-      fn: { params, body, env: this },
+      fn: { params, restParam, env: this, body },
     })
   }
 

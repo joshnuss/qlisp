@@ -670,6 +670,96 @@ describe('evalNodes()', () => {
     })
   })
 
+  describe('&rest parameters', () => {
+    it('collects extra arguments into a list, for defun', () => {
+      const env = createGlobalEnv()
+      const ast = read(`
+        (defun my-list (&rest xs) xs)
+        (my-list 1 2 3)
+      `)
+
+      expect(evalNodes(ast, env)).toEqual({
+        type: 'list',
+        elements: [
+          { type: 'number', value: 1 },
+          { type: 'number', value: 2 },
+          { type: 'number', value: 3 },
+        ],
+      })
+    })
+
+    it('collects extra arguments into a list, for lambda', () => {
+      const env = createGlobalEnv()
+      const ast = read('((lambda (&rest xs) xs) 1 2 3)')
+
+      expect(evalNodes(ast, env)).toEqual({
+        type: 'list',
+        elements: [
+          { type: 'number', value: 1 },
+          { type: 'number', value: 2 },
+          { type: 'number', value: 3 },
+        ],
+      })
+    })
+
+    it('binds an empty list when no extra arguments are given', () => {
+      const env = createGlobalEnv()
+      const ast = read(`
+        (defun my-list (&rest xs) xs)
+        (my-list)
+      `)
+
+      expect(evalNodes(ast, env)).toEqual({ type: 'list', elements: [] })
+    })
+
+    it('binds fixed parameters normally alongside the rest parameter', () => {
+      const env = createGlobalEnv()
+      const ast = read(`
+        (defun my-sum (a &rest rest) (+ a (apply + rest)))
+        (my-sum 1 2 3 4)
+      `)
+
+      expect(evalNodes(ast, env)).toEqual({ type: 'number', value: 10 })
+    })
+
+    it('throws when fewer than the fixed arguments are given', () => {
+      const env = createGlobalEnv()
+      const ast = read(`
+        (defun f (a &rest r) a)
+        (f)
+      `)
+
+      expect(() => evalNodes(ast, env)).toThrowError(
+        "Function 'f' expects at least 1 arguments, got 0"
+      )
+    })
+
+    it('throws when &rest is not followed by a parameter symbol', () => {
+      const env = createGlobalEnv()
+      const ast = read('(defun f (a &rest) a)')
+
+      expect(() => evalNodes(ast, env)).toThrowError(
+        "'&rest' must be followed by exactly one parameter symbol"
+      )
+    })
+
+    it('throws when &rest is not the last element of the parameter list', () => {
+      const env = createGlobalEnv()
+      const ast = read('(defun f (a &rest b c) a)')
+
+      expect(() => evalNodes(ast, env)).toThrowError(
+        "'&rest' parameter must be the last in the list"
+      )
+    })
+
+    it('is pretty-printed with &rest in the parameter list', () => {
+      const env = createGlobalEnv()
+      const ast = read('(lambda (a &rest b) a)')
+
+      expect(pretty(evalNodes(ast, env))).toBe('#<lambda (a &rest b)>')
+    })
+  })
+
   describe('apply', () => {
     it('applies a builtin resolved via the function namespace', () => {
       const env = createGlobalEnv()
