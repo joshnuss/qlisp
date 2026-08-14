@@ -13,6 +13,7 @@ A toy Lisp interpreter built in a day using Gemini.
 - **🔄 REPL** — Developer code interactively from the terminal (`qlisp`).
 - **🧪 Tests** — Full suite powered by Vitest, and custom harness for testing `.lisp` files.
 - **🪄 Macros** — Compile-time macro expansion before execution.
+- **🔥 Stuff** — `lambda` functions, `&rest` params, tail recursion and more... 😱
 - **☁️ GitHub Codespaces** — Pre-configured `.devcontainer` environment for developing remotely.
 
 ## Installation & Setup
